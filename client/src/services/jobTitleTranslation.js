@@ -37,7 +37,6 @@ export function useTranslatedJobTitle(title, languageCode) {
 
   useEffect(() => {
     let active = true;
-    setTranslatedTitle(originalTitle); // Show English immediately while translation loads.
     getTranslatedJobTitle(originalTitle, languageCode).then((value) => {
       if (active) setTranslatedTitle(value);
     });

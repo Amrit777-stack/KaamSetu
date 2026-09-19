@@ -21,6 +21,7 @@ async function runWorkerWithdrawTests() {
   const employer = await registerUser({
     name: `Employer Test ${rand}`,
     email: `employer${rand}@kaamsetu.demo`,
+    password: "password123",
     role: "employer",
     companyName: `Test Corp ${rand}`,
     phone: "9876543211",

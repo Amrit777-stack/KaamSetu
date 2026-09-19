@@ -115,6 +115,7 @@ export async function hireApplicant(applicationId) {
         worker: {
           id: Number(application.worker_id),
           name: application.worker_name,
+          is_available: false,
         },
         job: jobRes.rows[0],
         withdrawnApplications: withdrawnRes.rows,

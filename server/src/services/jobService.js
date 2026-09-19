@@ -39,9 +39,17 @@ let fallbackJobs = [
 let nextJobId = 3;
 
 export async function getJobs(filters = {}) {
-  const { employer_id: employerId, open_only: openOnly, unique } = filters;
+  const { employer_id: employerId, open_only: openOnly, unique, order_by: orderBy } = filters;
   const isUnique = unique === "true" || unique === true;
   const isOpenOnly = openOnly === "true" || openOnly === true;
+
+  const workerLat = Number.isFinite(Number(filters.latitude ?? filters.worker_latitude))
+    ? Number(filters.latitude ?? filters.worker_latitude)
+    : null;
+  const workerLon = Number.isFinite(Number(filters.longitude ?? filters.worker_longitude))
+    ? Number(filters.longitude ?? filters.worker_longitude)
+    : null;
+  const sortByDistance = (orderBy === "distance" || filters.nearby === "true") && workerLat !== null && workerLon !== null;
 
   const page = Math.max(Number(filters.page) || 1, 1);
   const limit = Math.min(Math.max(Number(filters.limit) || 20, 1), 50);
@@ -49,11 +57,11 @@ export async function getJobs(filters = {}) {
 
   if (isDatabaseConfigured()) {
     const conditions = [];
-    const values = [];
+    const whereValues = [];
 
     if (employerId) {
-      values.push(Number(employerId));
-      conditions.push(`employer_id = $${values.length}`);
+      whereValues.push(Number(employerId));
+      conditions.push(`employer_id = $${whereValues.length}`);
     }
 
     if (isOpenOnly) {
@@ -78,16 +86,147 @@ export async function getJobs(filters = {}) {
         ${whereClause}
       `;
 
-    const countResult = await pool.query(countQuery, values);
+    const countResult = await pool.query(countQuery, whereValues);
     const total = countResult.rows[0].total;
 
     // Get only the requested page
-    const dataValues = [...values, limit, offset];
+    const dataValues = [...whereValues];
+    let latIdx = null;
+    let lonIdx = null;
+    if (sortByDistance) {
+      dataValues.push(workerLat);
+      latIdx = dataValues.length;
+      dataValues.push(workerLon);
+      lonIdx = dataValues.length;
+    }
 
-    const query = isUnique
-      ? `
-        SELECT * FROM (
-          SELECT DISTINCT ON (LOWER(title), LOWER(company_name))
+    dataValues.push(limit);
+    const limitIdx = dataValues.length;
+    dataValues.push(offset);
+    const offsetIdx = dataValues.length;
+
+    let query = "";
+    if (isUnique) {
+      if (sortByDistance) {
+        query = `
+          SELECT * FROM (
+            SELECT DISTINCT ON (LOWER(title), LOWER(company_name))
+              id,
+              employer_id,
+              company_name,
+              company_industry,
+              company_contact,
+              title,
+              description,
+              skills,
+              experience_required,
+              salary_min,
+              salary_max,
+              location,
+              latitude,
+              longitude,
+              shift,
+              employment_type,
+              openings,
+              source,
+              status,
+              created_at,
+              CASE
+                WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN
+                  (6371 * acos(least(1.0, greatest(-1.0,
+                    cos(radians($${latIdx})) * cos(radians(latitude)) * cos(radians(longitude) - radians($${lonIdx})) +
+                    sin(radians($${latIdx})) * sin(radians(latitude))
+                  ))))
+                ELSE NULL
+              END AS dist
+            FROM jobs
+            ${whereClause}
+            ORDER BY LOWER(title), LOWER(company_name), dist ASC NULLS LAST, created_at DESC
+          ) sub
+          ORDER BY
+            CASE WHEN dist IS NOT NULL THEN 0 ELSE 1 END ASC,
+            dist ASC,
+            created_at DESC
+          LIMIT $${limitIdx}
+          OFFSET $${offsetIdx}
+        `;
+      } else {
+        query = `
+          SELECT * FROM (
+            SELECT DISTINCT ON (LOWER(title), LOWER(company_name))
+              id,
+              employer_id,
+              company_name,
+              company_industry,
+              company_contact,
+              title,
+              description,
+              skills,
+              experience_required,
+              salary_min,
+              salary_max,
+              location,
+              latitude,
+              longitude,
+              shift,
+              employment_type,
+              openings,
+              source,
+              status,
+              created_at
+            FROM jobs
+            ${whereClause}
+            ORDER BY LOWER(title), LOWER(company_name), created_at DESC
+          ) sub
+          ORDER BY created_at DESC
+          LIMIT $${limitIdx}
+          OFFSET $${offsetIdx}
+        `;
+      }
+    } else {
+      if (sortByDistance) {
+        query = `
+          SELECT
+            id,
+            employer_id,
+            company_name,
+            company_industry,
+            company_contact,
+            title,
+            description,
+            skills,
+            experience_required,
+            salary_min,
+            salary_max,
+            location,
+            latitude,
+            longitude,
+            shift,
+            employment_type,
+            openings,
+            source,
+            status,
+            created_at,
+            CASE
+              WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN
+                (6371 * acos(least(1.0, greatest(-1.0,
+                  cos(radians($${latIdx})) * cos(radians(latitude)) * cos(radians(longitude) - radians($${lonIdx})) +
+                  sin(radians($${latIdx})) * sin(radians(latitude))
+                ))))
+              ELSE NULL
+            END AS dist
+          FROM jobs
+          ${whereClause}
+          ORDER BY
+            CASE WHEN dist IS NOT NULL THEN 0 ELSE 1 END ASC,
+            dist ASC,
+            created_at DESC
+          LIMIT $${limitIdx}
+          OFFSET $${offsetIdx}
+        `;
+      } else {
+        query = `
+          SELECT
             id,
             employer_id,
             company_name,
@@ -110,44 +249,17 @@ export async function getJobs(filters = {}) {
             created_at
           FROM jobs
           ${whereClause}
-          ORDER BY LOWER(title), LOWER(company_name), created_at DESC
-        ) sub
-        ORDER BY created_at DESC
-        LIMIT $${dataValues.length - 1}
-        OFFSET $${dataValues.length}
-      `
-      : `
-        SELECT
-          id,
-          employer_id,
-          company_name,
-          company_industry,
-          company_contact,
-          title,
-          description,
-          skills,
-          experience_required,
-          salary_min,
-          salary_max,
-          location,
-          latitude,
-          longitude,
-          shift,
-          employment_type,
-          openings,
-          source,
-          status,
-          created_at
-        FROM jobs
-        ${whereClause}
-        ORDER BY created_at DESC
-        LIMIT $${dataValues.length - 1}
-        OFFSET $${dataValues.length}
-      `;
+          ORDER BY created_at DESC
+          LIMIT $${limitIdx}
+          OFFSET $${offsetIdx}
+        `;
+      }
+    }
 
     const { rows } = await pool.query(query, dataValues);
     const formatted = rows.map((r) => {
       const expNum = Number(r.experience_required != null ? r.experience_required : r.required_experience) || 0;
+      const rawDist = r.dist != null ? Number(r.dist) : null;
       return {
         ...r,
         id: Number(r.id),
@@ -155,6 +267,8 @@ export async function getJobs(filters = {}) {
         experience_required: expNum,
         required_experience: expNum,
         requiredExperience: expNum,
+        distance_km: roundedDistanceKm(rawDist),
+        _distance: rawDist,
       };
     });
 
@@ -190,6 +304,18 @@ export async function getJobs(filters = {}) {
     });
   }
 
+  if (sortByDistance) {
+    jobs = jobs.map((job) => {
+      const rawDistance = calculateDistanceKm(workerLat, workerLon, job.latitude, job.longitude);
+      return { ...job, distance_km: roundedDistanceKm(rawDistance), _distance: rawDistance };
+    });
+    jobs.sort((a, b) => {
+      const aDist = Number.isFinite(a._distance) ? a._distance : Infinity;
+      const bDist = Number.isFinite(b._distance) ? b._distance : Infinity;
+      return aDist - bDist;
+    });
+  }
+
   const total = jobs.length;
   const paginatedJobs = jobs.slice(offset, offset + limit).map((job) => {
     const expNum = Number(job.experience_required != null ? job.experience_required : job.required_experience) || 0;
@@ -212,17 +338,27 @@ export async function getJobs(filters = {}) {
 
 export async function getNearbyJobsForWorker(workerUserId, filters = {}) {
   const worker = await getWorkerProfile(workerUserId);
-  // Retain the current open/unique job behaviour; without coordinates this is
-  // deliberately indistinguishable from ordinary job browsing.
-  const result = await getJobs({ ...filters, limit: filters.limit || 50 });
-  const hasLocation = Number.isFinite(worker.latitude) && Number.isFinite(worker.longitude);
+  const lat = Number.isFinite(Number(filters.latitude)) ? Number(filters.latitude) : worker.latitude;
+  const lon = Number.isFinite(Number(filters.longitude)) ? Number(filters.longitude) : worker.longitude;
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lon);
   const requestedRadius = Number(filters.radius_km);
   const workerOccupation = (worker.occupation || "").trim().toLowerCase();
   const workerSkills = (Array.isArray(worker.skills) ? worker.skills : []).map((skill) => String(skill).trim().toLowerCase()).filter(Boolean);
+
+  const result = await getJobs({
+    ...filters,
+    latitude: lat,
+    longitude: lon,
+    order_by: hasLocation ? "distance" : (filters.order_by || "created_at"),
+    limit: filters.limit || 50,
+  });
+
   const jobs = result.data.map((job) => {
-    const rawDistance = hasLocation
-      ? calculateDistanceKm(worker.latitude, worker.longitude, job.latitude, job.longitude)
-      : null;
+    const rawDistance = Number.isFinite(job._distance)
+      ? job._distance
+      : hasLocation
+        ? calculateDistanceKm(lat, lon, job.latitude, job.longitude)
+        : null;
     const title = (job.title || "").toLowerCase();
     const jobSkills = (Array.isArray(job.skills) ? job.skills : Array.isArray(job.required_skills) ? job.required_skills : []).map((skill) => String(skill).trim().toLowerCase());
     const skillMatches = workerSkills.filter((skill) => jobSkills.some((jobSkill) => jobSkill.includes(skill) || skill.includes(jobSkill))).length;
@@ -236,12 +372,19 @@ export async function getNearbyJobsForWorker(workerUserId, filters = {}) {
   }).filter((job) => !Number.isFinite(requestedRadius) || requestedRadius <= 0 || job._distance === null || job._distance <= requestedRadius);
 
   jobs.sort((left, right) => {
-    // Suitability remains primary; distance only breaks otherwise-equal matches.
-    if (left.match_score !== right.match_score) return right.match_score - left.match_score;
-    if (left._distance === null && right._distance !== null) return 1;
-    if (left._distance !== null && right._distance === null) return -1;
-    return (left._distance || 0) - (right._distance || 0);
+    // Primary sort: strictly least to max distance
+    const leftDist = Number.isFinite(left._distance) ? left._distance : (Number.isFinite(left.distance_km) ? left.distance_km : Infinity);
+    const rightDist = Number.isFinite(right._distance) ? right._distance : (Number.isFinite(right.distance_km) ? right.distance_km : Infinity);
+    if (leftDist !== rightDist) {
+      return leftDist - rightDist;
+    }
+    // Tie-breaker: suitability/match score
+    if (left.match_score !== right.match_score) {
+      return right.match_score - left.match_score;
+    }
+    return 0;
   });
+
   return { ...result, data: jobs.map(({ _distance, ...job }) => job), total: jobs.length, totalPages: 1, locationAvailable: hasLocation };
 }
 export async function createJob(jobData) {

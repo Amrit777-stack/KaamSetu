@@ -1045,7 +1045,7 @@ function Auth({ initialMode = "login", initialRole }) {
             : res.user;
           setStoredUser(updatedUser);
           if (!locationResult.success) {
-            try { sessionStorage.setItem("kaamsetu_location_notice", locationResult.message); } catch {}
+            try { sessionStorage.setItem("kaamsetu_location_notice", locationResult.message); } catch (e) { void e; }
           }
           navigate("/worker/dashboard");
         } else {
@@ -1416,15 +1416,21 @@ function WorkerDashboard() {
   const [nearbyRadius, setNearbyRadius] = useState("all");
   const [routeJob, setRouteJob] = useState(null);
 
-  const loadAvailableJobs = async (radius = nearbyRadius) => {
-    const query = new URLSearchParams({ page: "1", limit: "30", open_only: "true", unique: "true" });
+  const loadAvailableJobs = async (radius = nearbyRadius, customLat = null, customLng = null) => {
+    const lat = customLat ?? currentUser?.latitude;
+    const lng = customLng ?? currentUser?.longitude;
+    const query = new URLSearchParams({ page: "1", limit: "40", open_only: "true", unique: "true" });
     if (radius !== "all") query.set("radius_km", radius);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      query.set("latitude", String(lat));
+      query.set("longitude", String(lng));
+    }
     try {
       const res = await apiRequest(`/jobs/nearby?${query.toString()}`);
       if (res?.data) setAvailableJobs(res.data);
     } catch {
       // Keep normal job browsing available for old sessions or a temporary API issue.
-      const res = await apiRequest("/jobs?page=1&limit=30&open_only=true&unique=true");
+      const res = await apiRequest("/jobs?page=1&limit=40&open_only=true&unique=true");
       if (res?.data) setAvailableJobs(res.data);
     }
   };
@@ -1469,7 +1475,6 @@ function WorkerDashboard() {
   const [voiceSubmitting, setVoiceSubmitting] = useState(false);
   const [voiceRecorder, setVoiceRecorder] = useState(null);
   const [isSpeakingVoice, setIsSpeakingVoice] = useState(false);
-  const [translatedVoiceQuestion, setTranslatedVoiceQuestion] = useState("");
   // Exists only while the voice-search modal is open; never persisted.
   const [voiceSearch, setVoiceSearch] = useState(null);
   const [voiceQuestion, setVoiceQuestion] = useState("");
@@ -1503,10 +1508,14 @@ function WorkerDashboard() {
     try {
       const locationNotice = sessionStorage.getItem("kaamsetu_location_notice");
       if (locationNotice) {
-        setBanner({ type: "info", title: "Location notice", message: locationNotice });
+        setTimeout(() => {
+          setBanner({ type: "info", title: "Location notice", message: locationNotice });
+        }, 0);
         sessionStorage.removeItem("kaamsetu_location_notice");
       }
-    } catch {}
+    } catch (e) {
+      void e;
+    }
 
     if (user.id) {
       // Load real worker profile from database
@@ -1526,6 +1535,7 @@ function WorkerDashboard() {
                   if (result.city) setCurrentUser((prev) => ({ ...prev, location: result.city }));
                 })
                 .catch(() => {});
+              loadAvailableJobs(nearbyRadius, res.data.latitude, res.data.longitude);
             }
             if (!Number.isFinite(res.data.latitude) || !Number.isFinite(res.data.longitude)) {
               setLocationDialog(true);
@@ -1545,7 +1555,10 @@ function WorkerDashboard() {
     }
 
     // Load available jobs for Tab 1 (only open opportunities, deduplicated)
-    loadAvailableJobs();
+    const loadTimer = setTimeout(() => {
+      loadAvailableJobs();
+    }, 0);
+    return () => clearTimeout(loadTimer);
   }, [navigate]);
 
   useEffect(() => {
@@ -1651,97 +1664,6 @@ function WorkerDashboard() {
     }
   };
 
-  const handleLegacyVoiceApplication = async (overrideAnswer = "") => {
-    const finalAnswer =
-      overrideAnswer ||
-      voiceAnswer.trim() ||
-      voiceAnswers[voiceStep] ||
-      (voiceStep === 0 ? currentUser.name : voiceStep === 1 ? currentUser.occupation : "2");
-    const updatedAnswers = [...voiceAnswers];
-    updatedAnswers[voiceStep] = finalAnswer;
-    setVoiceAnswers(updatedAnswers);
-
-    if (voiceStep < 2) {
-      setVoiceStep(voiceStep + 1);
-      setVoiceAnswer("");
-      setVoiceTranscript("");
-      setVoiceListening(false);
-      setTranslatedVoiceQuestion("");
-    } else {
-      setActionLoading("submitting-voice");
-      try {
-        const workerName = updatedAnswers[0] || currentUser.name;
-        const workerOccupation = updatedAnswers[1] || currentUser.occupation;
-        const workerExp = parseFloat(updatedAnswers[2]) || 2;
-
-        if (currentUser?.id) {
-          await apiRequest("/workers/profile", {
-            method: "POST",
-            body: JSON.stringify({
-              userId: currentUser.id,
-              name: workerName,
-              occupation: workerOccupation,
-              skills: [workerOccupation],
-              experienceYears: workerExp,
-              location: currentUser.location || "Pune",
-              language: currentLang,
-            }),
-          });
-          const updatedUser = {
-            ...currentUser,
-            name: workerName,
-            occupation: workerOccupation,
-          };
-          setCurrentUser(updatedUser);
-          // Keep the shared session user in sync so the top-right header badge
-          // reflects the newly entered name immediately and after navigation.
-          setStoredUser(updatedUser);
-          setWorkerProfileDetails((prev) => prev && ({
-            ...prev,
-            name: workerName,
-            occupation: workerOccupation,
-            experienceYears: workerExp,
-          }));
-        }
-
-        if (voiceApplyJob && voiceApplyJob.id && currentUser?.id) {
-          await apiRequest("/applications/apply", {
-            method: "POST",
-            body: JSON.stringify({
-              workerId: currentUser.id,
-              jobId: voiceApplyJob.id,
-            }),
-          });
-          setBanner({
-            type: "success",
-            title: "Application Submitted via Voice Assistant! 🎉",
-            message: `Applied for "${voiceApplyJob.title}" at ${voiceApplyJob.company_name}. Details recorded successfully.`,
-          });
-        } else {
-          setBanner({
-            type: "success",
-            title: "Voice Details Recorded!",
-            message: "Your voice responses and trade details have been saved to your profile.",
-          });
-        }
-
-        if (currentUser?.id) {
-          const res = await apiRequest(`/applications?worker_id=${currentUser.id}`);
-          if (res && res.data) setWorkerApplications(res.data);
-        }
-      } catch (err) {
-        setBanner({
-          type: "error",
-          title: "Voice Application Notice",
-          message: err.message || "Failed to finalize voice application",
-        });
-      } finally {
-        setActionLoading(null);
-        handleCloseVoiceApply();
-      }
-    }
-  };
-
   const handleNextVoiceStep = async (overrideAnswer = "") => {
     const finalAnswer = overrideAnswer || voiceAnswer.trim() || voiceAnswers[voiceStep];
     if (!finalAnswer || !voiceSearch) return;
@@ -1775,7 +1697,12 @@ function WorkerDashboard() {
   };
 
   useEffect(() => {
-    if (voiceApplyJob && voiceQuestion) playVoiceQuestion(voiceQuestion);
+    if (voiceApplyJob && voiceQuestion) {
+      const timer = setTimeout(() => {
+        playVoiceQuestion(voiceQuestion);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
   }, [voiceApplyJob, voiceQuestion]);
 
   const handleApply = async (job) => {
@@ -1847,19 +1774,6 @@ function WorkerDashboard() {
     currentUser.occupation ||
     "Welder";
 
-  const localizedCity =
-    currentLang === "hi-IN"
-      ? "पुणे"
-      : currentLang === "ta-IN"
-        ? "புனே"
-        : currentLang === "te-IN"
-          ? "పుణె"
-          : currentLang === "mr-IN"
-            ? "पुणे"
-            : currentLang === "kn-IN"
-              ? "ಪುಣೆ"
-              : "Pune";
-
   const appliedJobIds = new Set(workerApplications.map((a) => Number(a.job_id)));
   const dynamicCity = currentUser.location || "Location unavailable";
 
@@ -1889,26 +1803,32 @@ function WorkerDashboard() {
       }
     }
 
-    // Prioritize trade/occupation matches for the current worker
     const workerOcc = (currentUser?.occupation || "").trim().toLowerCase();
-    if (workerOcc) {
-      return [...unique].sort((a, b) => {
-        if (Number.isFinite(a.match_score) && Number.isFinite(b.match_score) && a.match_score !== b.match_score) {
-          return b.match_score - a.match_score;
-        }
-        const aTitle = (a.title || "").toLowerCase();
-        const bTitle = (b.title || "").toLowerCase();
-        const aMatch = aTitle.includes(workerOcc);
-        const bMatch = bTitle.includes(workerOcc);
+
+    // Order companies strictly from least to max distance (ascending distance)
+    return [...unique].sort((a, b) => {
+      const aDist = Number.isFinite(a.distance_km) ? a.distance_km : Infinity;
+      const bDist = Number.isFinite(b.distance_km) ? b.distance_km : Infinity;
+
+      if (aDist !== bDist) {
+        return aDist - bDist; // Least to max distance!
+      }
+
+      // Tie-breaker 1: match_score (higher suitability first when distance is equal)
+      if (Number.isFinite(a.match_score) && Number.isFinite(b.match_score) && a.match_score !== b.match_score) {
+        return b.match_score - a.match_score;
+      }
+
+      // Tie-breaker 2: occupation title match
+      if (workerOcc) {
+        const aMatch = (a.title || "").toLowerCase().includes(workerOcc);
+        const bMatch = (b.title || "").toLowerCase().includes(workerOcc);
         if (aMatch && !bMatch) return -1;
         if (!aMatch && bMatch) return 1;
-        const aDistance = Number.isFinite(a.distance_km) ? a.distance_km : Infinity;
-        const bDistance = Number.isFinite(b.distance_km) ? b.distance_km : Infinity;
-        return aDistance - bDistance;
-      });
-    }
+      }
 
-    return unique;
+      return 0;
+    });
   }, [availableJobs, currentUser.occupation]);
 
   return (
@@ -2659,9 +2579,6 @@ function WorkerDashboard() {
 function Employer() {
   const navigate = useNavigate();
   const [currentUser] = useState(getStoredUser);
-  const [currentLang, setCurrentLang] = useState(
-    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
-  );
   const [activeTab, setActiveTab] = useState("jobs"); // "jobs" | "candidates"
   const [candidateSubTab, setCandidateSubTab] = useState("list"); // "list" | "details"
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
@@ -2675,14 +2592,6 @@ function Employer() {
   const [showPostJob, setShowPostJob] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [banner, setBanner] = useState(null);
-
-  useEffect(() => {
-    const handleLangChange = (event) => {
-      setCurrentLang(event.detail || localStorage.getItem("kaamsetu_language") || "hi-IN");
-    };
-    window.addEventListener("kaamsetu_language_changed", handleLangChange);
-    return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
-  }, []);
   const [editingJobId, setEditingJobId] = useState(null);
   const [editingOpenings, setEditingOpenings] = useState("");
 
