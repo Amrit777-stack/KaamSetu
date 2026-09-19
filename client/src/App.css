@@ -30,6 +30,13 @@
 .badge.badge-shortlisted{background:#fff5e0;color:#8f5c09}
 .badge.badge-hired{background:#206449;color:#fff}
 .badge.badge-withdrawn{background:#eaeaea;color:#717a75}
+.badge.badge-rejected,.badge.badge-rejected-red{background:#fdf0ed;color:#c53030;border:1px solid #f6ccc6}
+.button.danger-outline{background:#fff;border:1px solid #e02424;color:#c53030;display:inline-flex;align-items:center;gap:5px;transition:.15s ease}
+.button.danger-outline:hover{background:#fdf0ed;border-color:#c53030}
+.button.revoke-btn{background:#fff;border:1px solid #c53030;color:#c53030;display:inline-flex;align-items:center;gap:5px;transition:.15s ease}
+.button.revoke-btn:hover{background:#fdf0ed;border-color:#9b1c1c;color:#9b1c1c}
+.cross-revoke-icon{width:24px;height:24px;border-radius:50%;border:1px solid #c53030;color:#c53030;background:#fff;display:inline-grid;place-items:center;cursor:pointer;margin-left:4px;transition:.15s ease;padding:0}
+.cross-revoke-icon:hover{background:#c53030;color:#fff}
 .availability-pill{font-size:11px;padding:3px 8px;border-radius:12px;font-weight:600}
 .availability-pill.avail{background:#e2f2e6;color:#185437}
 .availability-pill.unavail{background:#f3f3f0;color:#838a86}
@@ -89,4 +96,27 @@
 .job-apply-card:hover{box-shadow:0 8px 24px #122c1b0a}
 .job-apply-card-left{flex:1}
 .job-apply-card-right{flex-shrink:0}
+
+/* Subtabs Navigation */
+.subtab-bar{display:inline-flex;gap:6px;background:#f1f4ec;padding:4px;border-radius:10px;margin-bottom:20px;max-width:100%;flex-wrap:wrap}
+.subtab-btn{border:0;background:transparent;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s ease}
+.subtab-btn:hover{color:var(--ink)}
+.subtab-btn.active{background:#fff;color:var(--green);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+
+/* Worker Details Subtab Card */
+.worker-details-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:28px;box-shadow:0 6px 24px rgba(18,44,27,.05);margin-bottom:24px}
+.worker-details-header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:20px;border-bottom:1px solid var(--line);gap:16px;flex-wrap:wrap}
+.worker-details-main{display:flex;gap:18px;align-items:center}
+.worker-details-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:22px 0}
+.worker-detail-item{background:#fafbfa;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.worker-detail-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);display:block;margin-bottom:4px}
+.worker-detail-val{font-size:15px;font-weight:700;color:var(--ink);margin:0}
+.worker-detail-skills{margin:20px 0}
+.skills-tags-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.skill-tag-pill{background:#eaf2e8;color:var(--green);font-size:13px;font-weight:600;padding:6px 12px;border-radius:20px;border:1px solid #cce2c9;display:inline-flex;align-items:center;gap:5px}
+.candidate-selector-bar{display:flex;gap:8px;align-items:center;overflow-x:auto;padding-bottom:10px;margin-bottom:18px}
+.candidate-select-chip{border:1px solid var(--line);background:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--muted);transition:.15s ease}
+.candidate-select-chip:hover{border-color:var(--green);color:var(--green)}
+.candidate-select-chip.active{background:var(--green);color:#fff;border-color:var(--green)}
+
 

@@ -6,8 +6,8 @@ import { authenticateUser, registerUser } from "../services/authService.js";
  */
 export async function login(request, response) {
   try {
-    const { email, password, expectedRole } = request.body;
-    const user = await authenticateUser({ email, password, expectedRole });
+    const { email, password, userId, expectedRole } = request.body;
+    const user = await authenticateUser({ email, password, userId, expectedRole });
     return response.status(200).json({
       success: true,
       message: `Welcome back, ${user.name}!`,
