@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   AlertCircle,
   ArrowLeft,
@@ -28,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { apiRequest } from "./services/api.js";
+import { captureAndSaveWorkerLocation } from "./services/workerLocation.js";
 import {
   prefetchQuestionTranslations,
   translateQuestion,
@@ -1008,6 +1012,16 @@ function Auth({ initialMode = "login", initialRole }) {
 
         setStoredUser(res.user);
         if (res.user.role === "worker") {
+          // Sign-in refreshes the worker's current position. A denial or failure
+          // is deliberately non-blocking: authentication has already succeeded.
+          const locationResult = await captureAndSaveWorkerLocation();
+          const updatedUser = locationResult.success
+            ? { ...res.user, ...locationResult.location, location: locationResult.city || res.user.location }
+            : res.user;
+          setStoredUser(updatedUser);
+          if (!locationResult.success) {
+            try { sessionStorage.setItem("kaamsetu_location_notice", locationResult.message); } catch {}
+          }
           navigate("/worker/dashboard");
         } else {
           navigate("/employer");
@@ -1269,6 +1283,45 @@ function Auth({ initialMode = "login", initialRole }) {
   );
 }
 
+function FitRouteBounds({ points }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length > 1) map.fitBounds(points, { padding: [36, 36] });
+  }, [map, points]);
+  return null;
+}
+
+const mapIcon = (emoji) => L.divIcon({ className: "kaamsetu-map-marker", html: `<span>${emoji}</span>`, iconSize: [30, 30], iconAnchor: [15, 30] });
+
+function RouteModal({ job, worker, onClose }) {
+  const workerLatitude = Number(worker?.latitude); const workerLongitude = Number(worker?.longitude);
+  const jobLatitude = Number(job?.latitude); const jobLongitude = Number(job?.longitude);
+  const hasWorkerLocation = Number.isFinite(workerLatitude) && Number.isFinite(workerLongitude);
+  const hasJobLocation = Number.isFinite(jobLatitude) && Number.isFinite(jobLongitude);
+  const [route, setRoute] = useState(null); const [routeError, setRouteError] = useState("");
+  useEffect(() => {
+    if (!hasWorkerLocation || !hasJobLocation) return undefined;
+    let cancelled = false;
+    const query = new URLSearchParams({ startLatitude: String(workerLatitude), startLongitude: String(workerLongitude), endLatitude: String(jobLatitude), endLongitude: String(jobLongitude) });
+    apiRequest(`/location/route?${query.toString()}`).then((response) => { if (!cancelled) setRoute(response.route); }).catch(() => { if (!cancelled) setRouteError("Route unavailable. You can still view the job location."); });
+    return () => { cancelled = true; };
+  }, [hasWorkerLocation, hasJobLocation, workerLatitude, workerLongitude, jobLatitude, jobLongitude]);
+  const workerPoint = [workerLatitude, workerLongitude]; const jobPoint = [jobLatitude, jobLongitude];
+  const routePoints = route?.coordinates?.map(([longitude, latitude]) => [latitude, longitude]) || [];
+  const mapPoints = routePoints.length ? routePoints : [workerPoint, jobPoint];
+  return <div className="location-overlay" role="dialog" aria-modal="true" aria-labelledby="route-title"><div className="route-dialog">
+    <button className="location-close" type="button" onClick={onClose} aria-label="Close directions"><X size={19} /></button>
+    <h3 id="route-title">Route to this job</h3><p className="route-job-title">{job?.title} · {job?.location || "Job location"}</p>
+    {!hasWorkerLocation ? <div className="location-result info">Enable location to get directions.</div> : !hasJobLocation ? <div className="location-result info">Directions are unavailable for this job.</div> : <>
+      <div className="route-map"><MapContainer center={workerPoint} zoom={12} scrollWheelZoom><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" /><Marker position={workerPoint} icon={mapIcon("📍")}><Tooltip permanent>Your location</Tooltip></Marker><Marker position={jobPoint} icon={mapIcon("🏢")}><Tooltip permanent>{job?.title || "Job location"}</Tooltip></Marker>{routePoints.length > 1 && <Polyline positions={routePoints} pathOptions={{ color: "#206449", weight: 5 }} />}<FitRouteBounds points={mapPoints} /></MapContainer></div>
+      <div className="route-summary"><span>📍 Your location</span><span>🏢 {job?.location || "Job location"}</span></div>
+      {Number.isFinite(job?.distance_km) && <p className="route-distance">{job.distance_km} km away</p>}
+      <p className="route-distance">{route ? `Road distance: ${route.distanceKm} km${route.durationMinutes ? ` · about ${route.durationMinutes} min` : ""}` : routeError || "Finding road route..."}</p>
+    </>}
+    <button className="button secondary full" type="button" onClick={onClose}>Close</button>
+  </div></div>;
+}
+
 /**
  * WORKER DASHBOARD: "Post new oppurtunity" + "See your progress"
  */
@@ -1292,6 +1345,54 @@ function WorkerDashboard() {
   const [detailsError, setDetailsError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [locationDialog, setLocationDialog] = useState(false);
+  const [locationStatus, setLocationStatus] = useState("idle");
+  const [locationMessage, setLocationMessage] = useState("");
+  const [manualLocation, setManualLocation] = useState("");
+  const [nearbyRadius, setNearbyRadius] = useState("all");
+  const [routeJob, setRouteJob] = useState(null);
+
+  const loadAvailableJobs = async (radius = nearbyRadius) => {
+    const query = new URLSearchParams({ page: "1", limit: "30", open_only: "true", unique: "true" });
+    if (radius !== "all") query.set("radius_km", radius);
+    try {
+      const res = await apiRequest(`/jobs/nearby?${query.toString()}`);
+      if (res?.data) setAvailableJobs(res.data);
+    } catch {
+      // Keep normal job browsing available for old sessions or a temporary API issue.
+      const res = await apiRequest("/jobs?page=1&limit=30&open_only=true&unique=true");
+      if (res?.data) setAvailableJobs(res.data);
+    }
+  };
+
+  const allowLocation = async () => {
+    setLocationStatus("loading");
+    setLocationMessage("");
+    const result = await captureAndSaveWorkerLocation();
+    if (!result.success) {
+      setLocationStatus("error");
+      setLocationMessage(result.message);
+      return;
+    }
+    setCurrentUser((user) => ({ ...user, ...result.location, location: result.city || user.location }));
+    setLocationStatus("success");
+    setLocationMessage("Showing jobs near your location.");
+    await loadAvailableJobs();
+  };
+
+  const saveManualLocation = async (event) => {
+    event.preventDefault();
+    if (!manualLocation.trim()) return;
+    try {
+      await apiRequest("/workers/location/manual", { method: "POST", body: JSON.stringify({ location: manualLocation.trim() }) });
+      setCurrentUser((user) => ({ ...user, location: manualLocation.trim() }));
+      setLocationStatus("manual");
+      setLocationMessage("Your city was saved. Enable precise location any time to see exact distances.");
+    } catch (error) {
+      setLocationStatus("error");
+      setLocationMessage(error.message || "Could not save your city.");
+    }
+  };
 
   // Voice Assistant Application State (opens only when worker clicks apply for new job)
   const [voiceApplyJob, setVoiceApplyJob] = useState(null);
@@ -1331,6 +1432,14 @@ function WorkerDashboard() {
       return;
     }
 
+    try {
+      const locationNotice = sessionStorage.getItem("kaamsetu_location_notice");
+      if (locationNotice) {
+        setBanner({ type: "info", title: "Location notice", message: locationNotice });
+        sessionStorage.removeItem("kaamsetu_location_notice");
+      }
+    } catch {}
+
     if (user.id) {
       // Load real worker profile from database
       apiRequest(`/workers/${user.id}`)
@@ -1343,6 +1452,16 @@ function WorkerDashboard() {
               location: res.data.location || prev.location,
             }));
             setWorkerProfileDetails(res.data);
+            if (Number.isFinite(res.data.latitude) && Number.isFinite(res.data.longitude)) {
+              apiRequest(`/location/reverse?latitude=${encodeURIComponent(res.data.latitude)}&longitude=${encodeURIComponent(res.data.longitude)}`)
+                .then((result) => {
+                  if (result.city) setCurrentUser((prev) => ({ ...prev, location: result.city }));
+                })
+                .catch(() => {});
+            }
+            if (!Number.isFinite(res.data.latitude) || !Number.isFinite(res.data.longitude)) {
+              setLocationDialog(true);
+            }
           }
         })
         .catch(() => {});
@@ -1358,13 +1477,7 @@ function WorkerDashboard() {
     }
 
     // Load available jobs for Tab 1 (only open opportunities, deduplicated)
-    apiRequest("/jobs?page=1&limit=30&open_only=true&unique=true")
-      .then((res) => {
-        if (res && res.data) {
-          setAvailableJobs(res.data);
-        }
-      })
-      .catch(() => {});
+    loadAvailableJobs();
   }, [navigate]);
 
   useEffect(() => {
@@ -1607,8 +1720,7 @@ function WorkerDashboard() {
         title: "Application Withdrawn",
         message: `Your application for "${app.job_title}" has been withdrawn.`,
       });
-      const jobsRes = await apiRequest("/jobs?page=1&limit=30&open_only=true&unique=true");
-      if (jobsRes && jobsRes.data) setAvailableJobs(jobsRes.data);
+      await loadAvailableJobs();
     } catch (err) {
       setBanner({
         type: "error",
@@ -1641,6 +1753,7 @@ function WorkerDashboard() {
               : "Pune";
 
   const appliedJobIds = new Set(workerApplications.map((a) => Number(a.job_id)));
+  const dynamicCity = currentUser.location || "Location unavailable";
 
   // Deduplicate and filter available open opportunities (one opportunity once)
   const displayedAvailableJobs = useMemo(() => {
@@ -1668,13 +1781,18 @@ function WorkerDashboard() {
     const workerOcc = (currentUser?.occupation || "").trim().toLowerCase();
     if (workerOcc) {
       return [...unique].sort((a, b) => {
+        if (Number.isFinite(a.match_score) && Number.isFinite(b.match_score) && a.match_score !== b.match_score) {
+          return b.match_score - a.match_score;
+        }
         const aTitle = (a.title || "").toLowerCase();
         const bTitle = (b.title || "").toLowerCase();
         const aMatch = aTitle.includes(workerOcc);
         const bMatch = bTitle.includes(workerOcc);
         if (aMatch && !bMatch) return -1;
         if (!aMatch && bMatch) return 1;
-        return 0;
+        const aDistance = Number.isFinite(a.distance_km) ? a.distance_km : Infinity;
+        const bDistance = Number.isFinite(b.distance_km) ? b.distance_km : Infinity;
+        return aDistance - bDistance;
       });
     }
 
@@ -1695,7 +1813,7 @@ function WorkerDashboard() {
                 <BadgeCheck size={20} style={{ color: "var(--green)", verticalAlign: "middle" }} />
               </h2>
               <p>
-                {localizedOccupation} · {localizedCity}
+                {localizedOccupation} · {dynamicCity}
               </p>
             </div>
           </div>
@@ -1716,6 +1834,34 @@ function WorkerDashboard() {
             </div>
           </div>
         )}
+
+        {locationDialog && (
+          <div className="location-overlay" role="dialog" aria-modal="true" aria-labelledby="location-title">
+            <div className="location-dialog">
+              <button className="location-close" type="button" onClick={() => setLocationDialog(false)} aria-label="Close location prompt"><X size={19} /></button>
+              <span className="location-icon"><MapPin size={23} /></span>
+              <h3 id="location-title">Find jobs near you</h3>
+              <p>Allow KaamSetu to use your location to show nearby jobs and how far each job is from you.</p>
+              {locationStatus === "success" ? (
+                <div className="location-result success"><CheckCircle2 size={18} /><span><strong>Location enabled</strong><br />{locationMessage}</span></div>
+              ) : (
+                <button type="button" className="button primary full" onClick={allowLocation} disabled={locationStatus === "loading"}><MapPin size={17} /> {locationStatus === "loading" ? "Finding location..." : "Allow Location"}</button>
+              )}
+              {locationStatus === "success" ? (
+                <button type="button" className="button secondary full" onClick={() => setLocationDialog(false)}>Continue to jobs</button>
+              ) : (
+                <form onSubmit={saveManualLocation} className="manual-location-form">
+                  <label htmlFor="manual-location">Enter location manually</label>
+                  <div><input id="manual-location" value={manualLocation} onChange={(event) => setManualLocation(event.target.value)} placeholder="City or area (for example, Pune)" maxLength="160" /><button type="submit" className="button secondary small">Save city</button></div>
+                </form>
+              )}
+              {locationMessage && locationStatus !== "success" && <div className="location-result info">{locationMessage}</div>}
+              <button type="button" className="location-skip" onClick={() => setLocationDialog(false)}>Continue without location</button>
+            </div>
+          </div>
+        )}
+
+        {routeJob && <RouteModal job={routeJob} worker={currentUser} onClose={() => setRouteJob(null)} />}
 
         {/* Dashboard Tabs */}
         <div className="dashboard-tabs">
@@ -1914,10 +2060,17 @@ function WorkerDashboard() {
 
             {/* Direct Opportunity Applying Section */}
             <div>
+              <div className="jobs-heading-row">
               <h3 style={{ fontSize: "18px", margin: "0 0 16px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <BriefcaseBusiness size={20} style={{ color: "var(--green)" }} />
                 Open Opportunities ({displayedAvailableJobs.length})
               </h3>
+                <label className="nearby-filter">Nearby
+                  <select value={nearbyRadius} onChange={(event) => { setNearbyRadius(event.target.value); loadAvailableJobs(event.target.value); }}>
+                    <option value="all">All jobs</option><option value="5">Within 5 km</option><option value="10">Within 10 km</option><option value="25">Within 25 km</option>
+                  </select>
+                </label>
+              </div>
               {displayedAvailableJobs.length === 0 ? (
                 <div className="empty-state">No open jobs available currently. Check back soon!</div>
               ) : (
@@ -1938,6 +2091,7 @@ function WorkerDashboard() {
                           </p>
                           <div className="job-tags">
                             <span className="tag">📍 {job.location || "Pune"}</span>
+                            {Number.isFinite(job.distance_km) ? <span className="tag">📏 {job.distance_km} km away</span> : <span className="tag">📍 Enable location to see distance</span>}
                             <span className="tag">💰 ₹{job.salary_min?.toLocaleString()} - ₹{job.salary_max?.toLocaleString()}/mo</span>
                             <span className="tag">👥 {job.openings} Openings</span>
                             <span className="tag">
@@ -1972,6 +2126,9 @@ function WorkerDashboard() {
                               </button>
                             </>
                           )}
+                          <button type="button" className="button secondary small" onClick={() => setRouteJob(job)} style={{ padding: "8px 14px", fontSize: "13px" }}>
+                            <MapPin size={14} /> Directions
+                          </button>
                         </div>
                       </div>
                     );

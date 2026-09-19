@@ -1,4 +1,6 @@
 import { pool, isDatabaseConfigured } from "../config/db.js";
+import { getWorkerProfile } from "./workerService.js";
+import { calculateDistanceKm, roundedDistanceKm } from "./distanceService.js";
 
 // Fallback jobs used only if DATABASE_URL is not configured
 let fallbackJobs = [
@@ -206,6 +208,41 @@ export async function getJobs(filters = {}) {
     total,
     totalPages: Math.ceil(total / limit),
   };
+}
+
+export async function getNearbyJobsForWorker(workerUserId, filters = {}) {
+  const worker = await getWorkerProfile(workerUserId);
+  // Retain the current open/unique job behaviour; without coordinates this is
+  // deliberately indistinguishable from ordinary job browsing.
+  const result = await getJobs({ ...filters, limit: filters.limit || 50 });
+  const hasLocation = Number.isFinite(worker.latitude) && Number.isFinite(worker.longitude);
+  const requestedRadius = Number(filters.radius_km);
+  const workerOccupation = (worker.occupation || "").trim().toLowerCase();
+  const workerSkills = (Array.isArray(worker.skills) ? worker.skills : []).map((skill) => String(skill).trim().toLowerCase()).filter(Boolean);
+  const jobs = result.data.map((job) => {
+    const rawDistance = hasLocation
+      ? calculateDistanceKm(worker.latitude, worker.longitude, job.latitude, job.longitude)
+      : null;
+    const title = (job.title || "").toLowerCase();
+    const jobSkills = (Array.isArray(job.skills) ? job.skills : Array.isArray(job.required_skills) ? job.required_skills : []).map((skill) => String(skill).trim().toLowerCase());
+    const skillMatches = workerSkills.filter((skill) => jobSkills.some((jobSkill) => jobSkill.includes(skill) || skill.includes(jobSkill))).length;
+    const requiredExperience = Number(job.experience_required ?? job.required_experience) || 0;
+    let matchScore = workerOccupation && title.includes(workerOccupation) ? 50 : 0;
+    matchScore += Math.min(skillMatches, 3) * 10;
+    if (Number(worker.experienceYears) >= requiredExperience) matchScore += 10;
+    if (!worker.expectedSalaryMin || Number(job.salary_max) >= Number(worker.expectedSalaryMin)) matchScore += 6;
+    if (worker.preferredShift && job.shift && String(worker.preferredShift).toLowerCase() === String(job.shift).toLowerCase()) matchScore += 4;
+    return { ...job, distance_km: roundedDistanceKm(rawDistance), match_score: matchScore, _distance: rawDistance };
+  }).filter((job) => !Number.isFinite(requestedRadius) || requestedRadius <= 0 || job._distance === null || job._distance <= requestedRadius);
+
+  jobs.sort((left, right) => {
+    // Suitability remains primary; distance only breaks otherwise-equal matches.
+    if (left.match_score !== right.match_score) return right.match_score - left.match_score;
+    if (left._distance === null && right._distance !== null) return 1;
+    if (left._distance !== null && right._distance === null) return -1;
+    return (left._distance || 0) - (right._distance || 0);
+  });
+  return { ...result, data: jobs.map(({ _distance, ...job }) => job), total: jobs.length, totalPages: 1, locationAvailable: hasLocation };
 }
 export async function createJob(jobData) {
   const {

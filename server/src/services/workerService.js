@@ -29,6 +29,8 @@ export async function getWorkerProfile(userId) {
         wp.location,
         wp.latitude,
         wp.longitude,
+        wp.location_accuracy,
+        wp.location_updated_at,
         wp.preferred_shift,
         wp.language,
         wp.employment_history,
@@ -58,6 +60,10 @@ export async function getWorkerProfile(userId) {
       experienceYears: Number(row.experience_years) || 0,
       expectedSalaryMin: row.expected_salary_min ? Number(row.expected_salary_min) : null,
       location: row.location || "India",
+      latitude: row.latitude == null ? null : Number(row.latitude),
+      longitude: row.longitude == null ? null : Number(row.longitude),
+      accuracy: row.location_accuracy == null ? null : Number(row.location_accuracy),
+      capturedAt: row.location_updated_at || null,
       preferredShift: row.preferred_shift || "Day",
       language: row.language || "Hindi",
       employmentHistory: Array.isArray(row.employment_history) ? row.employment_history : [],
@@ -83,6 +89,76 @@ export async function getWorkerProfile(userId) {
   };
 
   return profile;
+}
+
+function validCoordinate(value, minimum, maximum) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum && number <= maximum ? number : null;
+}
+
+export async function updateWorkerLocation(userId, { latitude, longitude, accuracy } = {}) {
+  const lat = validCoordinate(latitude, -90, 90);
+  const lng = validCoordinate(longitude, -180, 180);
+  const accuracyValue = accuracy == null ? null : Number(accuracy);
+  if (lat === null || lng === null) {
+    const error = new Error("Latitude must be between -90 and 90 and longitude between -180 and 180");
+    error.status = 400;
+    throw error;
+  }
+  if (accuracyValue !== null && (!Number.isFinite(accuracyValue) || accuracyValue <= 0)) {
+    const error = new Error("Accuracy must be a positive number");
+    error.status = 400;
+    throw error;
+  }
+
+  if (isDatabaseConfigured()) {
+    const { rows } = await pool.query(
+      `UPDATE worker_profiles
+       SET latitude = $1, longitude = $2, location_accuracy = $3, location_updated_at = NOW(), updated_at = NOW()
+       WHERE user_id = $4
+       RETURNING latitude, longitude, location_accuracy, location_updated_at`,
+      [lat, lng, accuracyValue, Number(userId)]
+    );
+    if (!rows.length) {
+      const error = new Error("Worker profile not found");
+      error.status = 404;
+      throw error;
+    }
+    return {
+      latitude: Number(rows[0].latitude), longitude: Number(rows[0].longitude),
+      accuracy: rows[0].location_accuracy == null ? null : Number(rows[0].location_accuracy),
+      capturedAt: rows[0].location_updated_at,
+    };
+  }
+
+  const existing = await getWorkerProfile(userId);
+  const updated = { ...existing, latitude: lat, longitude: lng, accuracy: accuracyValue, capturedAt: new Date().toISOString() };
+  fallbackWorkerProfiles.set(Number(userId), updated);
+  return { latitude: lat, longitude: lng, accuracy: accuracyValue, capturedAt: updated.capturedAt };
+}
+
+export async function updateWorkerManualLocation(userId, location) {
+  const city = typeof location === "string" ? location.trim() : "";
+  if (!city || city.length > 160) {
+    const error = new Error("Enter a city or area name up to 160 characters");
+    error.status = 400;
+    throw error;
+  }
+  if (isDatabaseConfigured()) {
+    const { rows } = await pool.query(
+      "UPDATE worker_profiles SET location = $1, updated_at = NOW() WHERE user_id = $2 RETURNING location",
+      [city, Number(userId)]
+    );
+    if (!rows.length) {
+      const error = new Error("Worker profile not found");
+      error.status = 404;
+      throw error;
+    }
+    return { location: rows[0].location };
+  }
+  const existing = await getWorkerProfile(userId);
+  fallbackWorkerProfiles.set(Number(userId), { ...existing, location: city });
+  return { location: city };
 }
 
 /**

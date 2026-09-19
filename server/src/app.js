@@ -9,6 +9,7 @@ import jobRouter from "./routes/jobRoutes.js";
 import workerRouter from "./routes/workerRoutes.js";
 import applicationRouter from "./routes/applicationRoutes.js";
 import authRouter from "./routes/authRoutes.js";
+import locationRouter from "./routes/locationRoutes.js";
 
 import ttsRouter from "./routes/tts.js";
 import translateRouter from "./routes/translate.js";
@@ -32,6 +33,7 @@ app.get("/api/health", async (_request, response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/location", locationRouter);
 app.use("/api/workers", workerRouter);
 app.use("/api/employers", employerRouter);
 app.use("/api/jobs", jobRouter);

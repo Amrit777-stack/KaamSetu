@@ -1,26 +1,5 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
+import app from "./app.js";
 
-import ttsRouter from "./routes/tts.js";
-import translateRouter from "./routes/translate.js";
-import sttRouter from "./routes/stt.js";
-
-dotenv.config();
-
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.send("KaamSetu backend is running!");
-});
-
-app.use("/api/tts", ttsRouter);
-app.use("/api/translate", translateRouter);
-app.use("/api/stt", sttRouter);
-
-app.listen(4000, () => {
-  console.log("Server running on port 4000");
-});
+// app.js owns the single API server and routes. This import keeps
+// `node src/server.js` working as documented without starting a second server.
+export default app;

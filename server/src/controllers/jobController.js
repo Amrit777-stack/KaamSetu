@@ -1,4 +1,4 @@
-import { getJobs, createJob, updateJobOpenings, deleteJob } from "../services/jobService.js";
+import { getJobs, getNearbyJobsForWorker, createJob, updateJobOpenings, deleteJob } from "../services/jobService.js";
 
 export async function listJobs(request, response) {
   try {
@@ -7,6 +7,14 @@ export async function listJobs(request, response) {
   } catch (error) {
     const status = error.status || 500;
     return response.status(status).json({ error: error.message });
+  }
+}
+
+export async function listNearbyJobs(request, response) {
+  try {
+    return response.status(200).json(await getNearbyJobsForWorker(request.user.id, request.query));
+  } catch (error) {
+    return response.status(error.status || 500).json({ error: error.message });
   }
 }
 
