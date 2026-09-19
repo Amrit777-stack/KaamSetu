@@ -1,5 +1,5 @@
 import { emptyDirectory } from "../services/directoryService.js";
-import { getWorkerProfile, upsertWorkerProfile } from "../services/workerService.js";
+import { getWorkerProfile, upsertWorkerProfile, updateWorkerLocation, updateWorkerManualLocation } from "../services/workerService.js";
 
 export function listWorkers(_request, response) {
   response.json(emptyDirectory("Workers"));
@@ -28,6 +28,24 @@ export async function saveProfile(request, response) {
   } catch (error) {
     const status = error.status || 500;
     return response.status(status).json({ error: error.message });
+  }
+}
+
+export async function saveLocation(request, response) {
+  try {
+    const location = await updateWorkerLocation(request.user.id, request.body);
+    return response.status(200).json({ success: true, location });
+  } catch (error) {
+    return response.status(error.status || 500).json({ error: error.message });
+  }
+}
+
+export async function saveManualLocation(request, response) {
+  try {
+    const worker = await updateWorkerManualLocation(request.user.id, request.body.location);
+    return response.status(200).json({ success: true, worker });
+  } catch (error) {
+    return response.status(error.status || 500).json({ error: error.message });
   }
 }
 

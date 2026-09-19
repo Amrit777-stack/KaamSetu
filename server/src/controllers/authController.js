@@ -1,4 +1,5 @@
 import { authenticateUser, registerUser } from "../services/authService.js";
+import { createSessionToken } from "../services/sessionService.js";
 
 /**
  * POST /api/auth/login
@@ -11,7 +12,7 @@ export async function login(request, response) {
     return response.status(200).json({
       success: true,
       message: `Welcome back, ${user.name}!`,
-      user,
+      user: { ...user, authToken: createSessionToken(user) },
     });
   } catch (error) {
     const status = error.status || 500;
@@ -29,7 +30,7 @@ export async function register(request, response) {
     return response.status(201).json({
       success: true,
       message: `Account created successfully. Welcome to KaamSetu, ${user.name}!`,
-      user,
+      user: { ...user, authToken: createSessionToken(user) },
     });
   } catch (error) {
     const status = error.status || 500;
