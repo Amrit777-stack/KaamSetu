@@ -7,11 +7,11 @@ INSERT INTO users (id, name, email, password_hash, role) VALUES
   (6, 'Kavya Iyer', 'kavya@metro.example.test', '$2b$10$demo.hash.not.for.production', 'employer'),
   (7, 'Rahul Nair', 'rahul@precision.example.test', '$2b$10$demo.hash.not.for.production', 'employer');
 
-INSERT INTO worker_profiles (id, user_id, occupation, experience_years, expected_salary_min, location, preferred_shift, language) VALUES
-  (1, 1, 'Welder', 4, 20000, 'Pune', 'day', 'hi-IN'),
-  (2, 2, 'Electrician', 6, 24000, 'Pune', 'day', 'mr-IN'),
-  (3, 3, 'Plumber', 3, 18000, 'Mumbai', 'flexible', 'hi-IN'),
-  (4, 4, 'Machine Operator', 5, 23000, 'Chennai', 'night', 'ta-IN');
+INSERT INTO worker_profiles (id, user_id, occupation, experience_years, expected_salary_min, location, preferred_shift, language, is_available) VALUES
+  (1, 1, 'Welder', 4, 20000, 'Pune', 'day', 'hi-IN', TRUE),
+  (2, 2, 'Electrician', 6, 24000, 'Pune', 'day', 'mr-IN', TRUE),
+  (3, 3, 'Plumber', 3, 18000, 'Mumbai', 'flexible', 'hi-IN', TRUE),
+  (4, 4, 'Machine Operator', 5, 23000, 'Chennai', 'night', 'ta-IN', TRUE);
 
 INSERT INTO employer_profiles (id, user_id, company_name, location) VALUES
   (1, 5, 'Pragati Fabrication Works', 'Pune'),
@@ -38,12 +38,12 @@ INSERT INTO employment_history (worker_id, employer_name, role, duration) VALUES
   (3, 'Urban Plumbing Works', 'Plumber', '2022 - 2025'),
   (4, 'Southline Manufacturing', 'Machine Operator', '2020 - 2025');
 
-INSERT INTO applications (worker_id, job_id, status) VALUES
-  (1, 1, 'shortlisted'),
-  (1, 2, 'applied'),
-  (2, 4, 'shortlisted'),
-  (3, 7, 'applied'),
-  (4, 10, 'shortlisted');
+INSERT INTO applications (worker_id, job_id, status, updated_at) VALUES
+  (1, 1, 'shortlisted', NOW()),
+  (1, 2, 'applied', NOW()),
+  (2, 4, 'shortlisted', NOW()),
+  (3, 7, 'applied', NOW()),
+  (4, 10, 'shortlisted', NOW());
 
 SELECT setval('users_id_seq', 7, true);
 SELECT setval('worker_profiles_id_seq', 4, true);

@@ -16,6 +16,7 @@ CREATE TABLE worker_profiles (
   location VARCHAR(160) NOT NULL,
   preferred_shift VARCHAR(50),
   language VARCHAR(20) NOT NULL DEFAULT 'hi-IN',
+  is_available BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -39,7 +40,7 @@ CREATE TABLE jobs (
   required_experience NUMERIC(4, 1) NOT NULL DEFAULT 0 CHECK (required_experience >= 0),
   required_skills JSONB NOT NULL DEFAULT '[]'::jsonb,
   shift VARCHAR(50),
-  openings INTEGER NOT NULL DEFAULT 1 CHECK (openings > 0),
+  openings INTEGER NOT NULL DEFAULT 1 CHECK (openings >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -49,6 +50,7 @@ CREATE TABLE applications (
   job_id BIGINT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   status VARCHAR(30) NOT NULL DEFAULT 'applied' CHECK (status IN ('applied', 'shortlisted', 'rejected', 'hired', 'withdrawn')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (worker_id, job_id)
 );
 
@@ -64,3 +66,4 @@ CREATE TABLE employment_history (
 CREATE INDEX jobs_location_idx ON jobs (location);
 CREATE INDEX jobs_employer_idx ON jobs (employer_id);
 CREATE INDEX applications_worker_idx ON applications (worker_id);
+CREATE INDEX applications_worker_status_idx ON applications (worker_id, status);

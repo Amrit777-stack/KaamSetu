@@ -7,7 +7,18 @@ export async function apiRequest(path, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    let message = `API request failed with status ${response.status}`;
+    try {
+      const data = await response.json();
+      if (data && data.error) {
+        message = data.error;
+      }
+    } catch {
+      // Ignore if response is not JSON
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();

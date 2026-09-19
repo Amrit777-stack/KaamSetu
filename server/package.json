@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/app.js",
-    "start": "node src/app.js"
+    "start": "node src/app.js",
+    "test": "node test-hiring.js && node test-api.js && node test-auth.js && node test-signup-flow.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
