@@ -2,7 +2,9 @@ export const dashboardTranslations = {
   "en-IN": {
     // Header & Role
     jobSeeker: "Job Seeker",
+    employerRole: "Employer",
     availableForWork: "Available for Work",
+    signOut: "Sign out",
 
     // Landing Page
     findWork: "Find work",
@@ -109,7 +111,9 @@ export const dashboardTranslations = {
   "hi-IN": {
     // Header & Role
     jobSeeker: "कार्यकर्ता / कामगार",
+    employerRole: "नियोक्ता",
     availableForWork: "काम के लिए उपलब्ध",
+    signOut: "साइन आउट",
 
     // Landing Page
     findWork: "काम खोजें",
@@ -216,7 +220,9 @@ export const dashboardTranslations = {
   "ta-IN": {
     // Header & Role
     jobSeeker: "வேலை நாடுநர்",
+    employerRole: "முதலாளி",
     availableForWork: "வேலைக்கு தயார்",
+    signOut: "வெளியேறு",
 
     // Landing Page
     findWork: "வேலை தேடவும்",
@@ -323,7 +329,9 @@ export const dashboardTranslations = {
   "te-IN": {
     // Header & Role
     jobSeeker: "ఉద్యోగార్ధి",
+    employerRole: "యజమాని",
     availableForWork: "పనికి అందుబాటులో ఉన్నారు",
+    signOut: "సైన్ అవుట్",
 
     // Landing Page
     findWork: "పనిని కనుగొనండి",
@@ -430,7 +438,9 @@ export const dashboardTranslations = {
   "kn-IN": {
     // Header & Role
     jobSeeker: "ಉದ್ಯೋಗಾಕಾಂಕ್ಷಿ",
+    employerRole: "ಉದ್ಯೋಗದಾತ",
     availableForWork: "ಕೆಲಸಕ್ಕೆ ಲಭ್ಯವಿದೆ",
+    signOut: "ಸೈನ್ ಔಟ್",
 
     // Landing Page
     findWork: "ಕೆಲಸ ಹುಡುಕಿ",
@@ -537,7 +547,9 @@ export const dashboardTranslations = {
   "mr-IN": {
     // Header & Role
     jobSeeker: "कामगार / नोकरी शोधणारा",
+    employerRole: "नियोक्ता",
     availableForWork: "कामासाठी उपलब्ध",
+    signOut: "साइन आउट",
 
     // Landing Page
     findWork: "काम शोधा",
