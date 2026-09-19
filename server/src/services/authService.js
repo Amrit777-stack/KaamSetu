@@ -139,34 +139,26 @@ export async function registerUser({
 
       if (normalizedRole === "worker") {
         const workerRes = await client.query(
-          `INSERT INTO worker_profiles (user_id, occupation, experience_years, expected_salary_min, location, is_available)
-           VALUES ($1, $2, $3, $4, $5, TRUE)
+          `INSERT INTO worker_profiles (user_id, occupation, experience_years, expected_salary_min, location, skills, employment_history)
+           VALUES ($1, $2, $3, $4, $5, '[]'::jsonb, '[]'::jsonb)
+           ON CONFLICT (user_id) DO NOTHING
            RETURNING id`,
           [newUser.id, occupation, Number(experienceYears) || 0, Number(expectedSalaryMin) || 0, location]
         );
-        profileId = workerRes.rows[0].id;
-      } else {
-        const employerRes = await client.query(
-          `INSERT INTO employer_profiles (user_id, company_name, location)
-           VALUES ($1, $2, $3)
-           RETURNING id`,
-          [newUser.id, companyName, location]
-        );
-        profileId = employerRes.rows[0].id;
+        profileId = workerRes.rows[0]?.id || null;
       }
 
       await client.query("COMMIT");
 
       return {
-        id: newUser.id,
+        id: Number(newUser.id),
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
         profileId,
         occupation: normalizedRole === "worker" ? occupation : null,
-        companyName: normalizedRole === "employer" ? companyName : null,
+        companyName: normalizedRole === "employer" ? (companyName || newUser.name) : null,
         location,
-        isAvailable: true,
       };
     } catch (err) {
       await client.query("ROLLBACK");
@@ -195,7 +187,7 @@ export async function registerUser({
     role: normalizedRole,
     profile_id: profileId,
     occupation: normalizedRole === "worker" ? occupation : null,
-    company_name: normalizedRole === "employer" ? companyName : null,
+    company_name: normalizedRole === "employer" ? (companyName || trimmedName) : null,
     location,
     is_available: true,
   };
@@ -203,7 +195,7 @@ export async function registerUser({
   fallbackUsers.push(newUser);
 
   return {
-    id: newUser.id,
+    id: Number(newUser.id),
     name: newUser.name,
     email: newUser.email,
     role: newUser.role,
@@ -211,45 +203,99 @@ export async function registerUser({
     occupation: newUser.occupation,
     companyName: newUser.company_name,
     location: newUser.location,
-    isAvailable: true,
   };
 }
 
 /**
  * Authenticates user and verifies role match.
- * If user does not exist or their role doesn't match expectedRole:
- * Throws 404 "No account found".
+ * Worker login: validates email + user_id against users table.
+ * Employer login: validates email + password against users table.
  */
-export async function authenticateUser({ email, password, expectedRole }) {
+export async function authenticateUser({ email, password, userId, expectedRole }) {
   const normalizedEmail = (email || "").trim().toLowerCase();
   const normalizedRole = (expectedRole || "").trim().toLowerCase();
 
+  if (!normalizedRole || !["worker", "employer"].includes(normalizedRole)) {
+    const err = new Error("Invalid expected role specified");
+    err.status = 400;
+    throw err;
+  }
+
+  if (normalizedRole === "worker") {
+    // Worker login uses Email + User ID
+    const targetUserId = Number(userId || password);
+    if (!normalizedEmail || !targetUserId || Number.isNaN(targetUserId)) {
+      const err = new Error("Email and User ID are required");
+      err.status = 400;
+      throw err;
+    }
+
+    if (isDatabaseConfigured()) {
+      const userQuery = `
+        SELECT u.id, u.name, u.email, u.role,
+               wp.id as worker_profile_id, wp.occupation, wp.location as worker_location
+        FROM users u
+        LEFT JOIN worker_profiles wp ON u.id = wp.user_id
+        WHERE LOWER(u.email) = $1
+      `;
+      const { rows } = await pool.query(userQuery, [normalizedEmail]);
+
+      // If user does not exist, role is not worker, or user ID does not match
+      if (rows.length === 0 || rows[0].role !== "worker" || Number(rows[0].id) !== targetUserId) {
+        const err = new Error("No worker account found");
+        err.status = 404;
+        throw err;
+      }
+
+      const user = rows[0];
+      return {
+        id: Number(user.id),
+        name: user.name,
+        email: user.email,
+        role: "worker",
+        profileId: user.worker_profile_id ? Number(user.worker_profile_id) : null,
+        occupation: user.occupation || null,
+        location: user.worker_location || null,
+      };
+    }
+
+    // Fallback in-memory verification
+    const user = fallbackUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
+    if (!user || user.role !== "worker" || Number(user.id) !== targetUserId) {
+      const err = new Error("No worker account found");
+      err.status = 404;
+      throw err;
+    }
+
+    return {
+      id: Number(user.id),
+      name: user.name,
+      email: user.email,
+      role: "worker",
+      profileId: user.profile_id,
+      occupation: user.occupation || null,
+      location: user.location,
+    };
+  }
+
+  // Employer login uses Email + Password
   if (!normalizedEmail || !password) {
     const err = new Error("Email and password are required");
     err.status = 400;
     throw err;
   }
 
-  if (!["worker", "employer"].includes(normalizedRole)) {
-    const err = new Error("Invalid expected role specified");
-    err.status = 400;
-    throw err;
-  }
-
   if (isDatabaseConfigured()) {
     const userQuery = `
-      SELECT u.id, u.name, u.email, u.password_hash, u.role,
-             wp.id as worker_profile_id, wp.occupation, wp.location as worker_location, wp.is_available,
-             ep.id as employer_profile_id, ep.company_name, ep.location as employer_location
+      SELECT u.id, u.name, u.email, u.password_hash, u.role
       FROM users u
-      LEFT JOIN worker_profiles wp ON u.id = wp.user_id
-      LEFT JOIN employer_profiles ep ON u.id = ep.user_id
       WHERE LOWER(u.email) = $1
     `;
     const { rows } = await pool.query(userQuery, [normalizedEmail]);
 
-    if (rows.length === 0 || rows[0].role !== normalizedRole) {
-      const err = new Error("No account found");
+    // If user does not exist or role is not employer
+    if (rows.length === 0 || rows[0].role !== "employer") {
+      const err = new Error("No employer account found");
       err.status = 404;
       throw err;
     }
@@ -257,48 +303,40 @@ export async function authenticateUser({ email, password, expectedRole }) {
     const user = rows[0];
     const isValidPassword = password === "password123" || password === user.password_hash;
     if (!isValidPassword) {
-      const err = new Error("Invalid password");
+      const err = new Error("No employer account found");
       err.status = 401;
       throw err;
     }
 
     return {
-      id: user.id,
+      id: Number(user.id),
       name: user.name,
       email: user.email,
-      role: user.role,
-      profileId: user.role === "worker" ? user.worker_profile_id : user.employer_profile_id,
-      occupation: user.occupation || null,
-      companyName: user.company_name || null,
-      location: user.role === "worker" ? user.worker_location : user.employer_location,
-      isAvailable: user.is_available ?? null,
+      role: "employer",
+      companyName: user.name,
     };
   }
 
   // Fallback in-memory verification
   const user = fallbackUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
-
-  if (!user || user.role !== normalizedRole) {
-    const err = new Error("No account found");
+  if (!user || user.role !== "employer") {
+    const err = new Error("No employer account found");
     err.status = 404;
     throw err;
   }
 
   if (user.password !== password && password !== "password123") {
-    const err = new Error("Invalid password");
+    const err = new Error("No employer account found");
     err.status = 401;
     throw err;
   }
 
   return {
-    id: user.id,
+    id: Number(user.id),
     name: user.name,
     email: user.email,
-    role: user.role,
-    profileId: user.profile_id,
-    occupation: user.occupation || null,
-    companyName: user.company_name || null,
+    role: "employer",
+    companyName: user.company_name || user.name,
     location: user.location,
-    isAvailable: user.is_available ?? null,
   };
 }
