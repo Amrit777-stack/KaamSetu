@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -10,6 +10,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Edit2,
   Languages,
   LogOut,
   MapPin,
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  Trash2,
   User,
   UserPlus,
   Volume2,
@@ -249,7 +251,7 @@ function Landing() {
                   if (user && user.role === "employer") {
                     navigate("/employer");
                   } else {
-                    navigate("/signup?role=employer");
+                    navigate("/login/employer");
                   }
                 }}
               >
@@ -335,7 +337,7 @@ function ChooseRole() {
     if (currentUser && currentUser.role === "employer") {
       navigate("/employer");
     } else {
-      navigate("/signup?role=employer");
+      navigate("/login/employer");
     }
   };
 
@@ -480,7 +482,7 @@ function Onboarding() {
     return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
   }, []);
 
-  const next = (overrideAnswer = "") => {
+  const next = async (overrideAnswer = "") => {
     const newAnswers = [...answers];
     newAnswers[step] =
       overrideAnswer.trim() ||
@@ -497,6 +499,35 @@ function Onboarding() {
       setTranslationError("");
       setSpeechError("");
     } else {
+      const user = getStoredUser();
+      const workerName = newAnswers[0];
+      const workerOccupation = newAnswers[1];
+      const experienceYears = parseFloat(newAnswers[2]) || 2;
+
+      if (user && user.id && user.role === "worker") {
+        try {
+          await apiRequest("/workers/profile", {
+            method: "POST",
+            body: JSON.stringify({
+              userId: user.id,
+              name: workerName,
+              occupation: workerOccupation,
+              skills: [workerOccupation],
+              experienceYears,
+              location: "Pune",
+              language: preferredLanguageCode,
+            }),
+          });
+          setStoredUser({
+            ...user,
+            name: workerName || user.name,
+            occupation: workerOccupation,
+          });
+        } catch (e) {
+          console.warn("Failed to persist worker profile:", e);
+        }
+      }
+
       navigate(
         `/welcome?name=${encodeURIComponent(newAnswers[0])}&occupation=${encodeURIComponent(newAnswers[1])}`
       );
@@ -922,8 +953,8 @@ function Auth({ initialMode = "login", initialRole }) {
     "worker"
   ); // "worker" | "employer"
   const [name, setName] = useState(searchParams.get("name") || "");
-  const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -939,134 +970,90 @@ function Auth({ initialMode = "login", initialRole }) {
       return;
     }
 
-    if (mode === "login" && role === "worker") {
-      if (!mobile.trim() || !password.trim()) {
-        setError(t.errorMissingFields);
-        return;
+    if (mode === "login") {
+      if (role === "worker") {
+        if (!email.trim() || !userId.toString().trim()) {
+          setError(t.errorMissingFieldsWorker || "Please enter both Email and User ID");
+          return;
+        }
+      } else {
+        if (!email.trim() || !password.trim()) {
+          setError(t.errorMissingFieldsEmployer || "Please enter both Email and Password");
+          return;
+        }
       }
-      setStoredUser({
-        id: "demo-worker",
-        name: "Raju Kumar",
-        mobile: mobile.trim(),
-        role: "worker",
-        occupation: "Welder",
-        location: "Pune",
-      });
-      navigate("/worker/dashboard");
-      return;
     }
 
     setLoading(true);
 
     try {
       if (mode === "login") {
-        try {
-          const res = await apiRequest("/auth/login", {
-            method: "POST",
-            body: JSON.stringify({ email, password, expectedRole: role }),
-          });
-          setStoredUser(res.user);
-          if (res.user.role === "worker") {
-            navigate("/language");
-          } else {
-            navigate("/employer");
-          }
-        } catch (err) {
-          if (role === "employer" && email === "raju@example.test") {
-            setError("Account role mismatch: worker account cannot sign in as employer");
-            return;
-          }
-          if (
-            role === "employer" &&
-            (email === "amit@pragati.example.test" ||
-              err.message?.includes("failed") ||
-              err.message?.includes("fetch") ||
-              err.message?.includes("NetworkError") ||
-              err.message?.includes("500") ||
-              err.message?.includes("database"))
-          ) {
-            const mockEmployer = {
-              id: "demo-employer-1",
-              name: email === "amit@pragati.example.test" ? "Amit Shah" : (email.split("@")[0] || "Employer"),
-              email: email.trim(),
-              role: "employer",
-              companyName: "Pragati Fabrication Works",
-              profileId: 1,
-            };
-            setStoredUser(mockEmployer);
-            navigate("/employer");
-            return;
-          }
-          throw err;
+        const body =
+          role === "worker"
+            ? {
+                email: email.trim(),
+                userId: Number(userId.toString().trim()),
+                expectedRole: "worker",
+              }
+            : {
+                email: email.trim(),
+                password,
+                expectedRole: "employer",
+              };
+
+        const res = await apiRequest("/auth/login", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+
+        setStoredUser(res.user);
+        if (res.user.role === "worker") {
+          navigate("/worker/dashboard");
+        } else {
+          navigate("/employer");
         }
       } else {
         // Sign Up (Register)
-        try {
-          const res = await apiRequest("/auth/register", {
-            method: "POST",
-            body: JSON.stringify({
-              name,
-              email,
-              password,
-              role,
-              occupation: "Skilled Specialist",
-              experienceYears: 2,
-              location: "India",
-              companyName: role === "employer" ? (companyName || `${name}'s Company`) : null,
-            }),
-          });
-          setStoredUser(res.user);
-          if (res.user.role === "worker") {
-            navigate("/language");
-          } else {
-            navigate("/employer");
-          }
-        } catch (err) {
-          if (
-            err.message?.includes("failed") ||
-            err.message?.includes("fetch") ||
-            err.message?.includes("NetworkError") ||
-            err.message?.includes("500") ||
-            err.message?.includes("database")
-          ) {
-            const mockUser = {
-              id: `demo-${role}-${Date.now()}`,
-              name: name.trim() || (role === "worker" ? "Worker" : "Employer"),
-              email: email.trim(),
-              role,
-              occupation: "Skilled Specialist",
-              companyName: role === "employer" ? (companyName || `${name}'s Company`) : null,
-              profileId: 1,
-            };
-            setStoredUser(mockUser);
-            if (role === "worker") {
-              navigate("/language");
-            } else {
-              navigate("/employer");
-            }
-            return;
-          }
-          throw err;
+        const res = await apiRequest("/auth/register", {
+          method: "POST",
+          body: JSON.stringify({
+            name: name.trim(),
+            email: email.trim(),
+            password,
+            role,
+            companyName: role === "employer" ? (companyName.trim() || `${name.trim()}'s Company`) : null,
+          }),
+        });
+
+        setStoredUser(res.user);
+        if (res.user.role === "worker") {
+          navigate("/worker/dashboard");
+        } else {
+          navigate("/employer");
         }
       }
     } catch (err) {
-      if (err.status === 404 || err.message === "No account found" || (err.message && err.message.includes("404"))) {
-        setError("No account found");
+      const msg = err.message || "";
+      if (msg === "No worker account found" || msg.includes("No worker account found")) {
+        setError("No worker account found with these details.");
+      } else if (msg === "No employer account found" || msg.includes("No employer account found")) {
+        setError("No employer account found with these details.");
       } else {
-        setError(err.message || "Operation failed");
+        setError(msg || "Operation failed");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const fillCredentials = (fillVal, fillRole) => {
+  const fillCredentials = (fillEmail, fillRole, fillExtra) => {
+    setEmail(fillEmail);
     if (fillRole === "worker") {
-      setMobile(fillVal);
-      setPassword("abc123");
+      setUserId(fillExtra || "1");
+      setPassword("");
     } else {
-      setEmail(fillVal);
-      setPassword("password123");
+      setPassword(fillExtra || "password123");
+      setUserId("");
     }
     setError(null);
     if (fillRole) setRole(fillRole);
@@ -1155,43 +1142,43 @@ function Auth({ initialMode = "login", initialRole }) {
               </div>
             )}
 
+            <div className="form-group">
+              <label htmlFor="email">{t.emailLabel || "Email"}</label>
+              <input
+                id="email"
+                type="email"
+                required
+                placeholder={t.emailPlaceholder || (role === "worker" ? "worker1@kaamsetu.demo" : "employer501@kaamsetu.demo")}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
             {mode === "login" && role === "worker" ? (
               <div className="form-group">
-                <label htmlFor="mobile">{t.mobileLabel}</label>
+                <label htmlFor="userId">{t.userIdLabel || "User ID"}</label>
                 <input
-                  id="mobile"
-                  type="tel"
+                  id="userId"
+                  type="number"
                   required
-                  placeholder={t.mobilePlaceholder}
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
+                  placeholder={t.userIdPlaceholder || "Enter your User ID (e.g. 1)"}
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
                 />
               </div>
             ) : (
               <div className="form-group">
-                <label htmlFor="email">Email Address</label>
+                <label htmlFor="password">{t.passwordLabel || "Password"}</label>
                 <input
-                  id="email"
-                  type="email"
+                  id="password"
+                  type="password"
                   required
-                  placeholder={role === "worker" ? "your.email@example.com" : "contact@company.com"}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t.passwordPlaceholder || "Enter your password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
             )}
-
-            <div className="form-group">
-              <label htmlFor="password">{t.passwordLabel}</label>
-              <input
-                id="password"
-                type="password"
-                required
-                placeholder={mode === "login" && role === "worker" ? t.passwordPlaceholder : undefined}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
 
             {mode === "signup" && (
               <div className="form-group">
@@ -1242,9 +1229,17 @@ function Auth({ initialMode = "login", initialRole }) {
                   <button
                     type="button"
                     className="quick-chip"
-                    onClick={() => fillCredentials("9876543210", "worker")}
+                    onClick={() => fillCredentials("worker1@kaamsetu.demo", "worker", "1")}
                   >
                     <Check size={13} /> {t.quickChipWorker}
+                  </button>
+                  <button
+                    type="button"
+                    className="quick-chip warning"
+                    onClick={() => fillCredentials("employer501@kaamsetu.demo", "worker", "501")}
+                    title="Employer details in worker login"
+                  >
+                    <X size={13} /> Employer 501 &rarr; Fails
                   </button>
                 </div>
               ) : (
@@ -1252,14 +1247,14 @@ function Auth({ initialMode = "login", initialRole }) {
                   <button
                     type="button"
                     className="quick-chip"
-                    onClick={() => fillCredentials("amit@pragati.example.test", "employer")}
+                    onClick={() => fillCredentials("employer501@kaamsetu.demo", "employer", "password123")}
                   >
-                    <Check size={13} /> Amit Shah (Valid Employer)
+                    <Check size={13} /> {t.quickChipEmployer}
                   </button>
                   <button
                     type="button"
                     className="quick-chip warning"
-                    onClick={() => fillCredentials("raju@example.test", "employer")}
+                    onClick={() => fillCredentials("worker1@kaamsetu.demo", "employer", "password123")}
                     title="Worker email in employer login"
                   >
                     <X size={13} /> Raju Kumar (Worker &rarr; Fails)
@@ -1279,16 +1274,51 @@ function Auth({ initialMode = "login", initialRole }) {
  */
 function WorkerDashboard() {
   const navigate = useNavigate();
-  const [currentUser] = useState(() => getStoredUser() || {
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser() || {
     name: "Raju Kumar",
     occupation: "Welder",
     location: "Pune",
     role: "worker",
   });
   const [activeTab, setActiveTab] = useState("post"); // "post" | "progress"
+  const [progressSubTab, setProgressSubTab] = useState("applications"); // "applications" | "details"
   const [currentLang, setCurrentLang] = useState(
     () => localStorage.getItem("kaamsetu_language") || "hi-IN"
   );
+  const [availableJobs, setAvailableJobs] = useState([]);
+  const [workerApplications, setWorkerApplications] = useState([]);
+  const [workerProfileDetails, setWorkerProfileDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [banner, setBanner] = useState(null);
+
+  // Voice Assistant Application State (opens only when worker clicks apply for new job)
+  const [voiceApplyJob, setVoiceApplyJob] = useState(null);
+  const [voiceStep, setVoiceStep] = useState(0);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceAnswer, setVoiceAnswer] = useState("");
+  const [voiceAnswers, setVoiceAnswers] = useState(["", "", ""]);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceSubmitting, setVoiceSubmitting] = useState(false);
+  const [voiceRecorder, setVoiceRecorder] = useState(null);
+  const [isSpeakingVoice, setIsSpeakingVoice] = useState(false);
+  const [translatedVoiceQuestion, setTranslatedVoiceQuestion] = useState("");
+
+  const fetchWorkerProfileDetails = async (userId) => {
+    const id = userId || currentUser?.id;
+    if (!id) return;
+    setLoadingDetails(true);
+    setDetailsError(null);
+    try {
+      const res = await apiRequest(`/workers/${id}`);
+      setWorkerProfileDetails(res.data || res.worker || null);
+    } catch (err) {
+      setDetailsError(err.message || "Failed to load worker profile from database");
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
 
   useEffect(() => {
     const user = getStoredUser();
@@ -1298,7 +1328,43 @@ function WorkerDashboard() {
     }
     if (user.role !== "worker") {
       navigate("/employer");
+      return;
     }
+
+    if (user.id) {
+      // Load real worker profile from database
+      apiRequest(`/workers/${user.id}`)
+        .then((res) => {
+          if (res && res.data) {
+            setCurrentUser((prev) => ({
+              ...prev,
+              ...res.data,
+              occupation: res.data.occupation || prev.occupation,
+              location: res.data.location || prev.location,
+            }));
+            setWorkerProfileDetails(res.data);
+          }
+        })
+        .catch(() => {});
+
+      // Load worker's applications from database
+      apiRequest(`/applications?worker_id=${user.id}`)
+        .then((res) => {
+          if (res && res.data) {
+            setWorkerApplications(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+
+    // Load available jobs for Tab 1 (only open opportunities, deduplicated)
+    apiRequest("/jobs?page=1&limit=30&open_only=true&unique=true")
+      .then((res) => {
+        if (res && res.data) {
+          setAvailableJobs(res.data);
+        }
+      })
+      .catch(() => {});
   }, [navigate]);
 
   useEffect(() => {
@@ -1309,6 +1375,250 @@ function WorkerDashboard() {
     window.addEventListener("kaamsetu_language_changed", handleLangChange);
     return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
   }, []);
+
+  // Translate voice question when voice assistant is active
+  useEffect(() => {
+    if (!voiceApplyJob) return undefined;
+    let ignore = false;
+    const englishText = questions[voiceStep][1];
+    translateQuestion(englishText, currentLang)
+      .then((trans) => {
+        if (!ignore && trans) setTranslatedVoiceQuestion(trans);
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, [voiceApplyJob, voiceStep, currentLang]);
+
+  const currentVoiceQuestionDisplay =
+    translatedVoiceQuestion ||
+    getFallbackQuestion(questions[voiceStep][1], currentLang) ||
+    questions[voiceStep][0];
+
+  const playVoiceQuestion = async (text) => {
+    if (!text || isSpeakingVoice) return;
+    try {
+      setIsSpeakingVoice(true);
+      await speakText(text, currentLang);
+    } catch (e) {
+      console.warn("TTS playback error:", e);
+    } finally {
+      setIsSpeakingVoice(false);
+    }
+  };
+
+  const handleStartVoiceApply = (job = null) => {
+    setVoiceApplyJob(job || { title: "Skilled Opportunity", company_name: "KaamSetu Partner" });
+    setVoiceStep(0);
+    setVoiceAnswer(currentUser.name || "");
+    setVoiceAnswers([currentUser.name || "", currentUser.occupation || "", "2"]);
+    setVoiceTranscript("");
+    setVoiceListening(false);
+  };
+
+  const handleCloseVoiceApply = () => {
+    if (voiceListening && voiceRecorder) {
+      try {
+        voiceRecorder.stop();
+      } catch (e) {
+        console.warn("Failed to stop voice recorder:", e);
+      }
+    }
+    setVoiceListening(false);
+    setVoiceRecorder(null);
+    setVoiceApplyJob(null);
+  };
+
+  const toggleVoiceRecording = async () => {
+    if (voiceListening && voiceRecorder) {
+      voiceRecorder.stop();
+      return;
+    }
+    try {
+      setVoiceTranscript("");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setVoiceListening(false);
+        setVoiceRecorder(null);
+        setVoiceSubmitting(true);
+        try {
+          const audio = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+          const record = await submitVoiceResponse(
+            audio,
+            ["name", "occupation", "experienceYears"][voiceStep]
+          );
+          const recognized = record.englishTranscript || record.transcript || "";
+          setVoiceTranscript(recognized);
+          setVoiceAnswer(recognized);
+          setVoiceAnswers((prev) => {
+            const next = [...prev];
+            next[voiceStep] = recognized;
+            return next;
+          });
+        } catch (err) {
+          console.warn("Voice response transcription failed:", err);
+        } finally {
+          setVoiceSubmitting(false);
+        }
+      };
+      setVoiceRecorder(mediaRecorder);
+      mediaRecorder.start();
+      setVoiceListening(true);
+    } catch (err) {
+      console.warn("Microphone access failed:", err);
+    }
+  };
+
+  const handleNextVoiceStep = async (overrideAnswer = "") => {
+    const finalAnswer =
+      overrideAnswer ||
+      voiceAnswer.trim() ||
+      voiceAnswers[voiceStep] ||
+      (voiceStep === 0 ? currentUser.name : voiceStep === 1 ? currentUser.occupation : "2");
+    const updatedAnswers = [...voiceAnswers];
+    updatedAnswers[voiceStep] = finalAnswer;
+    setVoiceAnswers(updatedAnswers);
+
+    if (voiceStep < 2) {
+      setVoiceStep(voiceStep + 1);
+      setVoiceAnswer("");
+      setVoiceTranscript("");
+      setVoiceListening(false);
+      setTranslatedVoiceQuestion("");
+    } else {
+      setActionLoading("submitting-voice");
+      try {
+        const workerName = updatedAnswers[0] || currentUser.name;
+        const workerOccupation = updatedAnswers[1] || currentUser.occupation;
+        const workerExp = parseFloat(updatedAnswers[2]) || 2;
+
+        if (currentUser?.id) {
+          await apiRequest("/workers/profile", {
+            method: "POST",
+            body: JSON.stringify({
+              userId: currentUser.id,
+              name: workerName,
+              occupation: workerOccupation,
+              skills: [workerOccupation],
+              experienceYears: workerExp,
+              location: currentUser.location || "Pune",
+              language: currentLang,
+            }),
+          });
+          setCurrentUser((prev) => ({
+            ...prev,
+            name: workerName,
+            occupation: workerOccupation,
+          }));
+        }
+
+        if (voiceApplyJob && voiceApplyJob.id && currentUser?.id) {
+          await apiRequest("/applications/apply", {
+            method: "POST",
+            body: JSON.stringify({
+              workerId: currentUser.id,
+              jobId: voiceApplyJob.id,
+            }),
+          });
+          setBanner({
+            type: "success",
+            title: "Application Submitted via Voice Assistant! 🎉",
+            message: `Applied for "${voiceApplyJob.title}" at ${voiceApplyJob.company_name}. Details recorded successfully.`,
+          });
+        } else {
+          setBanner({
+            type: "success",
+            title: "Voice Details Recorded!",
+            message: "Your voice responses and trade details have been saved to your profile.",
+          });
+        }
+
+        if (currentUser?.id) {
+          const res = await apiRequest(`/applications?worker_id=${currentUser.id}`);
+          if (res && res.data) setWorkerApplications(res.data);
+        }
+      } catch (err) {
+        setBanner({
+          type: "error",
+          title: "Voice Application Notice",
+          message: err.message || "Failed to finalize voice application",
+        });
+      } finally {
+        setActionLoading(null);
+        handleCloseVoiceApply();
+      }
+    }
+  };
+
+  const handleApply = async (job) => {
+    if (!currentUser?.id) return;
+    try {
+      setActionLoading(job.id);
+      setBanner(null);
+      await apiRequest("/applications/apply", {
+        method: "POST",
+        body: JSON.stringify({
+          workerId: currentUser.id,
+          jobId: job.id,
+        }),
+      });
+      setBanner({
+        type: "success",
+        title: "Application Submitted!",
+        message: `Successfully applied for "${job.title}" at ${job.company_name}.`,
+      });
+      const res = await apiRequest(`/applications?worker_id=${currentUser.id}`);
+      if (res && res.data) {
+        setWorkerApplications(res.data);
+      }
+    } catch (err) {
+      setBanner({
+        type: "error",
+        title: "Notice",
+        message: err.message || "Failed to submit application",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleWithdraw = async (app) => {
+    if (!window.confirm(`Are you sure you want to withdraw your application for "${app.job_title}"?`)) {
+      return;
+    }
+    try {
+      setActionLoading(`withdraw-${app.id}`);
+      await apiRequest(`/applications/${app.id}/withdraw`, {
+        method: "POST",
+        body: JSON.stringify({ workerId: currentUser?.id }),
+      });
+      setWorkerApplications((prev) =>
+        prev.map((a) => (a.id === app.id ? { ...a, status: "Withdrawn" } : a))
+      );
+      setBanner({
+        type: "info",
+        title: "Application Withdrawn",
+        message: `Your application for "${app.job_title}" has been withdrawn.`,
+      });
+      const jobsRes = await apiRequest("/jobs?page=1&limit=30&open_only=true&unique=true");
+      if (jobsRes && jobsRes.data) setAvailableJobs(jobsRes.data);
+    } catch (err) {
+      setBanner({
+        type: "error",
+        title: "Withdraw Failed",
+        message: err.message || "Failed to withdraw application",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
 
@@ -1329,6 +1639,47 @@ function WorkerDashboard() {
             : currentLang === "kn-IN"
               ? "ಪುಣೆ"
               : "Pune";
+
+  const appliedJobIds = new Set(workerApplications.map((a) => Number(a.job_id)));
+
+  // Deduplicate and filter available open opportunities (one opportunity once)
+  const displayedAvailableJobs = useMemo(() => {
+    const seen = new Set();
+    const unique = [];
+
+    // Filter to only open opportunities (openings > 0 and not closed)
+    const validJobs = (availableJobs || []).filter(
+      (job) => job && (job.openings == null || Number(job.openings) > 0) && job.status !== "closed"
+    );
+
+    for (const job of validJobs) {
+      const normTitle = (job.title || "").trim().toLowerCase();
+      const normCompany = (job.company_name || "").trim().toLowerCase();
+      const key = `${normTitle}:::${normCompany}`;
+
+      if (!seen.has(key) && !seen.has(Number(job.id))) {
+        seen.add(key);
+        seen.add(Number(job.id));
+        unique.push(job);
+      }
+    }
+
+    // Prioritize trade/occupation matches for the current worker
+    const workerOcc = (currentUser?.occupation || "").trim().toLowerCase();
+    if (workerOcc) {
+      return [...unique].sort((a, b) => {
+        const aTitle = (a.title || "").toLowerCase();
+        const bTitle = (b.title || "").toLowerCase();
+        const aMatch = aTitle.includes(workerOcc);
+        const bMatch = bTitle.includes(workerOcc);
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return 0;
+      });
+    }
+
+    return unique;
+  }, [availableJobs, currentUser.occupation]);
 
   return (
     <div className="site-shell">
@@ -1355,142 +1706,278 @@ function WorkerDashboard() {
           </div>
         </div>
 
+        {banner && (
+          <div className={`banner ${banner.type}`} style={{ marginBottom: "20px" }}>
+            {banner.type === "success" && <CheckCircle2 size={22} />}
+            {banner.type === "error" && <AlertCircle size={22} />}
+            <div>
+              <strong>{banner.title}</strong>
+              <span>{banner.message}</span>
+            </div>
+          </div>
+        )}
+
         {/* Dashboard Tabs */}
         <div className="dashboard-tabs">
           <button
+            type="button"
             className={`dash-tab ${activeTab === "post" ? "active" : ""}`}
             onClick={() => setActiveTab("post")}
           >
-            <PlusCircle size={18} /> {t.postTab}
+            <PlusCircle size={18} /> {t.applyNewJobTab || "Apply for new job"}
           </button>
           <button
+            type="button"
             className={`dash-tab ${activeTab === "progress" ? "active" : ""}`}
             onClick={() => setActiveTab("progress")}
           >
-            <BriefcaseBusiness size={18} /> {t.progressTab}
+            <BriefcaseBusiness size={18} /> {t.progressTab || "See your progress"} ({workerApplications.length})
           </button>
         </div>
 
         {activeTab === "post" ? (
-          /* TAB 1: Post new oppurtunity */
-          <div
-            className="post-opportunity-panel"
-            style={{
-              background: "#fff",
-              border: "1px solid var(--line)",
-              borderRadius: "12px",
-              padding: "36px 28px",
-              textAlign: "center",
-              boxShadow: "0 4px 20px #122c1b05",
-            }}
-          >
+          /* TAB 1: Apply for new job */
+          <div>
+            {/* Action Banner */}
             <div
               style={{
-                width: "72px",
-                height: "72px",
-                borderRadius: "50%",
-                background: "#eaf0dd",
-                color: "var(--green)",
-                display: "grid",
-                placeItems: "center",
-                margin: "0 auto 16px",
-              }}
-            >
-              <Mic size={34} />
-            </div>
-
-            <div
-              style={{
-                display: "inline-flex",
+                background: "#fff",
+                border: "1px solid var(--line)",
+                borderRadius: "12px",
+                padding: "20px 24px",
+                display: "flex",
+                justifyContent: "space-between",
                 alignItems: "center",
-                gap: "6px",
-                background: "#f0f5ea",
-                color: "var(--green)",
-                padding: "4px 12px",
-                borderRadius: "20px",
-                fontSize: "12px",
-                fontWeight: "700",
-                marginBottom: "12px",
-              }}
-            >
-              <Sparkles size={14} /> {t.voiceBadge}
-            </div>
-
-            <h2 style={{ fontSize: "24px", margin: "0 0 10px", letterSpacing: "-0.5px" }}>
-              {t.postHeading}
-            </h2>
-            <p
-              style={{
-                color: "var(--muted)",
-                maxWidth: "540px",
-                margin: "0 auto 26px",
-                fontSize: "15px",
-                lineHeight: "1.6",
-              }}
-            >
-              {t.postDesc}
-            </p>
-
-            {/* BOTH Speech and Manual Fill Options */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
                 gap: "16px",
-                maxWidth: "640px",
-                margin: "0 auto 30px",
-                textAlign: "left",
+                flexWrap: "wrap",
+                boxShadow: "0 4px 16px #122c1b05",
+                marginBottom: "24px",
               }}
             >
+              <div>
+                <span className="step-label" style={{ marginBottom: "3px" }}>
+                  <Sparkles size={14} /> {t.voiceBadge || "AI VOICE ASSISTANT"}
+                </span>
+                <h3 style={{ margin: "2px 0 4px", fontSize: "18px", color: "var(--ink)" }}>
+                  {t.applyNewJobTab || "Apply for New Job"}
+                </h3>
+                <p style={{ margin: 0, color: "var(--muted)", fontSize: "14px" }}>
+                  Browse open vacancies below to apply directly, or speak naturally with our Voice Assistant.
+                </p>
+              </div>
               <button
-                className="mode-option featured"
-                onClick={() => navigate("/onboarding?mode=voice")}
-                style={{ cursor: "pointer", border: "2px solid var(--green)", padding: "18px" }}
+                type="button"
+                className="button primary"
+                onClick={() => handleStartVoiceApply(null)}
               >
-                <span className="mode-icon"><Mic size={26} /></span>
-                <div>
-                  <span className="recommended">Recommended</span>
-                  <h3 style={{ margin: "4px 0 6px", fontSize: "16px" }}>{t.speakBtn}</h3>
-                  <p style={{ margin: 0, fontSize: "13px", color: "var(--muted)" }}>{t.speakSub}</p>
-                </div>
-                <ArrowRight size={18} />
-              </button>
-
-              <button
-                className="mode-option"
-                onClick={() => navigate("/onboarding?mode=write")}
-                style={{ cursor: "pointer", padding: "18px" }}
-              >
-                <span className="mode-icon write"><PenLine size={26} /></span>
-                <div>
-                  <h3 style={{ margin: "4px 0 6px", fontSize: "16px" }}>{t.writeBtn}</h3>
-                  <p style={{ margin: 0, fontSize: "13px", color: "var(--muted)" }}>{t.writeSub}</p>
-                </div>
-                <ArrowRight size={18} />
+                <Mic size={16} /> Apply for New Job with Speech
               </button>
             </div>
 
-            <div
-              className="proof-strip"
-              style={{
-                maxWidth: "600px",
-                margin: "0 auto",
-                padding: "18px 0 0",
-                borderTop: "1px solid var(--line)",
-              }}
-            >
-              <div>
-                <strong>{t.speakFeatureTitle}</strong>
-                <span>{t.speakFeatureSub}</span>
+            {/* Voice Application Modal (opens ONLY if worker clicks apply for new job) */}
+            {voiceApplyJob && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(18, 44, 27, 0.45)",
+                  backdropFilter: "blur(4px)",
+                  zIndex: 999,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "20px",
+                }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: "16px",
+                    maxWidth: "560px",
+                    width: "100%",
+                    padding: "30px",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
+                    position: "relative",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div className="ai-orb" style={{ width: "36px", height: "36px" }}>
+                        <Sparkles size={18} />
+                      </div>
+                      <div>
+                        <span className="step-label">
+                          VOICE APPLICATION · STEP {voiceStep + 1} OF 3
+                        </span>
+                        <h3 style={{ margin: "2px 0 0", fontSize: "17px" }}>
+                          {voiceApplyJob.title ? `Applying for: ${voiceApplyJob.title}` : "Voice Job Application"}
+                        </h3>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCloseVoiceApply}
+                      style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--muted)", padding: "4px" }}
+                      title="Cancel and close"
+                    >
+                      <X size={22} />
+                    </button>
+                  </div>
+
+                  {/* Question Card */}
+                  <div className="question-card" style={{ padding: "20px 24px", borderRadius: "10px", margin: "14px 0", position: "relative" }}>
+                    <button
+                      type="button"
+                      className="listen-question"
+                      onClick={() => playVoiceQuestion(currentVoiceQuestionDisplay)}
+                      disabled={isSpeakingVoice}
+                      title="Listen to question aloud / सुनें"
+                    >
+                      <Volume2 size={20} />
+                    </button>
+                    <p className="hindi-question" style={{ fontSize: "19px", margin: 0 }}>
+                      {currentVoiceQuestionDisplay}
+                    </p>
+                    <p className="translation" style={{ margin: "6px 0 0", fontSize: "13px" }}>
+                      {questions[voiceStep][1]}
+                    </p>
+                  </div>
+
+                  {/* Voice recording & wave */}
+                  <div style={{ textAlign: "center", padding: "10px 0" }}>
+                    <div className={`sound-wave ${voiceListening ? "is-listening" : ""}`} style={{ marginBottom: "12px" }}>
+                      <i /><i /><i /><i /><i /><i /><i />
+                    </div>
+
+                    <button
+                      type="button"
+                      className={`mic-button ${voiceListening ? "recording" : ""}`}
+                      onClick={toggleVoiceRecording}
+                      disabled={voiceSubmitting}
+                    >
+                      <Mic size={28} />
+                    </button>
+
+                    <small style={{ display: "block", marginTop: "12px", color: "var(--muted)", fontSize: "12px" }}>
+                      {voiceListening
+                        ? "Listening... Tap to stop speaking"
+                        : voiceSubmitting
+                        ? "Processing your voice with Sarvam AI..."
+                        : "Tap mic and speak your answer naturally"}
+                    </small>
+                    {voiceTranscript && (
+                      <div style={{ marginTop: "10px", background: "#f0f5ea", padding: "8px 14px", borderRadius: "8px", fontSize: "13px", color: "var(--green)" }}>
+                        🎙️ <strong>Heard:</strong> "{voiceTranscript}"
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Manual entry option */}
+                  <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px dashed var(--line)" }}>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--muted)", marginBottom: "6px" }}>
+                      Or fill details manually:
+                    </label>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <input
+                        type="text"
+                        value={voiceAnswer}
+                        onChange={(e) => setVoiceAnswer(e.target.value)}
+                        placeholder={
+                          voiceStep === 0
+                            ? "Your Full Name"
+                            : voiceStep === 1
+                            ? "Trade / Occupation (e.g. Welder, Electrician)"
+                            : "Years of experience (e.g. 3)"
+                        }
+                        style={{
+                          flex: 1,
+                          padding: "10px 14px",
+                          border: "1px solid #cfd7cd",
+                          borderRadius: "8px",
+                          fontSize: "14px",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="button primary small"
+                        onClick={() => handleNextVoiceStep()}
+                        disabled={actionLoading === "submitting-voice"}
+                      >
+                        {voiceStep < 2 ? "Next" : actionLoading === "submitting-voice" ? "Submitting..." : "Submit Application"}
+                        <ArrowRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <strong>{t.instantExtractionTitle}</strong>
-                <span>{t.instantExtractionSub}</span>
-              </div>
-              <div>
-                <strong>{t.fairOppsTitle}</strong>
-                <span>{t.fairOppsSub}</span>
-              </div>
+            )}
+
+            {/* Direct Opportunity Applying Section */}
+            <div>
+              <h3 style={{ fontSize: "18px", margin: "0 0 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <BriefcaseBusiness size={20} style={{ color: "var(--green)" }} />
+                Open Opportunities ({displayedAvailableJobs.length})
+              </h3>
+              {displayedAvailableJobs.length === 0 ? (
+                <div className="empty-state">No open jobs available currently. Check back soon!</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {displayedAvailableJobs.map((job) => {
+                    const alreadyApplied = appliedJobIds.has(Number(job.id));
+                    return (
+                      <div key={job.id} className="job-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                            <h3 style={{ margin: 0 }}>{job.title}</h3>
+                            <span className="badge badge-applied" style={{ fontSize: "12px" }}>
+                              {job.company_name}
+                            </span>
+                          </div>
+                          <p style={{ color: "var(--muted)", margin: "0 0 8px", fontSize: "14px" }}>
+                            {job.description}
+                          </p>
+                          <div className="job-tags">
+                            <span className="tag">📍 {job.location || "Pune"}</span>
+                            <span className="tag">💰 ₹{job.salary_min?.toLocaleString()} - ₹{job.salary_max?.toLocaleString()}/mo</span>
+                            <span className="tag">👥 {job.openings} Openings</span>
+                            <span className="tag">
+                              🛠️ {Math.round(Number(job.experience_required != null ? job.experience_required : (job.required_experience != null ? job.required_experience : 0)))} yrs min exp
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          {alreadyApplied ? (
+                            <span className="badge badge-applied" style={{ padding: "8px 14px", fontSize: "13px" }}>
+                              <Check size={14} /> Applied
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="button primary small"
+                                onClick={() => handleStartVoiceApply(job)}
+                                style={{ padding: "8px 14px", fontSize: "13px" }}
+                                title="Apply for this job using speech assistant"
+                              >
+                                <Mic size={14} /> {t.voiceApplyBtn || "Voice Apply"}
+                              </button>
+                              <button
+                                type="button"
+                                className="button secondary small"
+                                disabled={actionLoading === job.id}
+                                onClick={() => handleApply(job)}
+                                style={{ padding: "8px 14px", fontSize: "13px" }}
+                              >
+                                {actionLoading === job.id ? "Applying..." : (t.quickApplyBtn || "Quick Apply")} <ArrowRight size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -1553,7 +2040,9 @@ function WorkerDashboard() {
                 >
                   {t.matchedOpps}
                 </span>
-                <h3 style={{ margin: "4px 0 0" }}>{t.trackedCount}</h3>
+                <h3 style={{ margin: "4px 0 0" }}>
+                  {workerApplications.length > 0 ? `${workerApplications.length} Tracked` : t.trackedCount}
+                </h3>
               </div>
               <div
                 style={{
@@ -1577,63 +2066,320 @@ function WorkerDashboard() {
               </div>
             </div>
 
-            {/* Application Progress Cards */}
-            <div className="candidate-grid">
-              {t.apps.map((app, idx) => {
-                const isShortlisted = idx === 0;
-                const isUnderReview = idx === 2;
-                const statusLabel = isShortlisted
-                  ? t.statusShortlisted
-                  : isUnderReview
-                    ? t.statusUnderReview
-                    : t.statusApplied;
-                const statusClass = isShortlisted
-                  ? "shortlisted"
-                  : isUnderReview
-                    ? "under_review"
-                    : "applied";
+            {/* Subtab Switcher: Applied Applications vs Worker Details */}
+            <div className="subtab-bar">
+              <button
+                className={`subtab-btn ${progressSubTab === "applications" ? "active" : ""}`}
+                onClick={() => setProgressSubTab("applications")}
+              >
+                <BriefcaseBusiness size={15} /> {t.applicationsSubTab || "Applied Opportunities"} ({workerApplications.length})
+              </button>
+              <button
+                className={`subtab-btn ${progressSubTab === "details" ? "active" : ""}`}
+                onClick={() => {
+                  setProgressSubTab("details");
+                  if (!workerProfileDetails && currentUser?.id) {
+                    fetchWorkerProfileDetails(currentUser.id);
+                  }
+                }}
+              >
+                <BadgeCheck size={15} /> {t.detailsSubTab || "Worker Details"}
+              </button>
+            </div>
 
-                return (
-                  <div key={idx} className={`app-card ${isShortlisted ? "is-hired" : ""}`}>
-                    <div className="app-card-left">
-                      <div className="app-avatar">
-                        <BriefcaseBusiness size={20} />
-                      </div>
-                      <div className="app-info">
-                        <h3>{app.jobTitle}</h3>
-                        <div className="app-meta">
-                          <span>
-                            <Building2 size={14} /> <strong>{app.company}</strong>
-                          </span>
-                          <span>
-                            <MapPin size={14} /> {app.location}
-                          </span>
-                          <span>💰 {app.salary}</span>
+            {progressSubTab === "applications" ? (
+              /* Subtab 1: Applications List */
+              workerApplications.length > 0 ? (
+                <div className="candidate-grid">
+                  {workerApplications.map((app) => {
+                    const status = app.status || "Applied";
+                    const isSelected = status === "Selected";
+                    const isShortlisted = status === "Shortlisted";
+                    const isRejected = status === "Rejected" || status.toLowerCase() === "rejected";
+                    const isWithdrawn = status === "Withdrawn" || status.toLowerCase() === "withdrawn";
+                    const statusClass = isSelected
+                      ? "shortlisted"
+                      : isShortlisted
+                        ? "shortlisted"
+                        : isRejected
+                          ? "rejected"
+                          : isWithdrawn
+                            ? "withdrawn"
+                            : "applied";
+
+                    return (
+                      <div key={app.id} className={`app-card ${isSelected ? "is-hired" : ""} ${isRejected ? "is-withdrawn" : ""}`}>
+                        <div className="app-card-left">
+                          <div className="app-avatar">
+                            <BriefcaseBusiness size={20} />
+                          </div>
+                          <div className="app-info">
+                            <h3>{app.job_title}</h3>
+                            <div className="app-meta">
+                              <span>
+                                <Building2 size={14} /> <strong>{app.company_name}</strong>
+                              </span>
+                              <span>
+                                <MapPin size={14} /> {app.job_location || "Pune"}
+                              </span>
+                              {app.salary_min && (
+                                <span>💰 ₹{Number(app.salary_min).toLocaleString()} - ₹{Number(app.salary_max).toLocaleString()}/mo</span>
+                              )}
+                            </div>
+                            <p
+                              style={{
+                                color: isSelected ? "var(--green)" : isRejected ? "#c53030" : "var(--muted)",
+                                fontSize: "13px",
+                                margin: "6px 0 0",
+                                fontWeight: isSelected || isRejected ? "600" : "normal",
+                              }}
+                            >
+                              {isSelected
+                                ? "🎉 Congratulations! You have been selected for this position."
+                                : isShortlisted
+                                  ? "Employer shortlisted your profile for next round."
+                                  : isRejected
+                                    ? "❌ Application rejected by employer."
+                                    : isWithdrawn
+                                      ? "Application closed."
+                                      : "Application submitted to employer."}
+                            </p>
+                          </div>
                         </div>
-                        <p
-                          style={{
-                            color: isShortlisted ? "var(--green)" : "var(--muted)",
-                            fontSize: "13px",
-                            margin: "6px 0 0",
-                            fontWeight: isShortlisted ? "600" : "normal",
-                          }}
-                        >
-                          {isShortlisted ? "🎉 " : "ℹ️ "}
-                          {app.note}
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="app-card-right">
-                      <span className={`badge badge-${statusClass}`}>
-                        {isShortlisted && <BadgeCheck size={14} />}
-                        {statusLabel}
-                      </span>
+                        <div className="app-card-right">
+                          <span className={`badge badge-${statusClass}`}>
+                            {isSelected && <BadgeCheck size={14} />}
+                            {isRejected && <X size={14} />}
+                            {isRejected ? "Rejected" : status}
+                          </span>
+                          {!isWithdrawn && !isRejected && (
+                            <button
+                              type="button"
+                              className="button danger-outline small"
+                              disabled={actionLoading === `withdraw-${app.id}`}
+                              onClick={() => handleWithdraw(app)}
+                              title="Withdraw this application"
+                            >
+                              <X size={13} /> {actionLoading === `withdraw-${app.id}` ? (t.withdrawingBtn || "Withdrawing...") : (t.withdrawBtn || "Withdraw Application")}
+                            </button>
+                          )}
+                          <button
+                            className="button secondary small"
+                            onClick={() => {
+                              setProgressSubTab("details");
+                              fetchWorkerProfileDetails(currentUser.id);
+                            }}
+                          >
+                            {t.viewDetailsBtn || "Details"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="candidate-grid">
+                  {t.apps.map((app, idx) => {
+                    const isShortlisted = idx === 0;
+                    const isUnderReview = idx === 2;
+                    const statusLabel = isShortlisted
+                      ? t.statusShortlisted
+                      : isUnderReview
+                        ? t.statusUnderReview
+                        : t.statusApplied;
+                    const statusClass = isShortlisted
+                      ? "shortlisted"
+                      : isUnderReview
+                        ? "under_review"
+                        : "applied";
+
+                    return (
+                      <div key={idx} className={`app-card ${isShortlisted ? "is-hired" : ""}`}>
+                        <div className="app-card-left">
+                          <div className="app-avatar">
+                            <BriefcaseBusiness size={20} />
+                          </div>
+                          <div className="app-info">
+                            <h3>{app.jobTitle}</h3>
+                            <div className="app-meta">
+                              <span>
+                                <Building2 size={14} /> <strong>{app.company}</strong>
+                              </span>
+                              <span>
+                                <MapPin size={14} /> {app.location}
+                              </span>
+                              <span>💰 {app.salary}</span>
+                            </div>
+                            <p
+                              style={{
+                                color: isShortlisted ? "var(--green)" : "var(--muted)",
+                                fontSize: "13px",
+                                margin: "6px 0 0",
+                                fontWeight: isShortlisted ? "600" : "normal",
+                              }}
+                            >
+                              {isShortlisted ? "🎉 " : "ℹ️ "}
+                              {app.note}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="app-card-right">
+                          <span className={`badge badge-${statusClass}`}>
+                            {isShortlisted && <BadgeCheck size={14} />}
+                            {statusLabel}
+                          </span>
+                          <button
+                            className="button secondary small"
+                            onClick={() => {
+                              setProgressSubTab("details");
+                              fetchWorkerProfileDetails(currentUser.id);
+                            }}
+                          >
+                            {t.viewDetailsBtn || "Details"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              /* Subtab 2: Worker Profile Details from Database */
+              <div className="worker-details-view">
+                {loadingDetails ? (
+                  <div className="empty-state">
+                    <Sparkles size={26} style={{ color: "var(--green)", marginBottom: "8px" }} />
+                    <p style={{ margin: 0, fontWeight: "600" }}>{t.loadingWorkerDetails || "Loading worker details from database..."}</p>
+                  </div>
+                ) : detailsError ? (
+                  <div className="banner error">
+                    <AlertCircle size={22} />
+                    <div>
+                      <strong>Failed to load profile details</strong>
+                      <span>{detailsError}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ) : workerProfileDetails ? (
+                  <div className="worker-details-card">
+                    <div className="worker-details-header">
+                      <div className="worker-details-main">
+                        <div className="worker-avatar-large">
+                          {workerProfileDetails.name ? workerProfileDetails.name[0] : "W"}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                            <h2 style={{ margin: 0, fontSize: "22px" }}>{workerProfileDetails.name}</h2>
+                            <span className="badge badge-applied" style={{ fontSize: "12px" }}>
+                              <BadgeCheck size={14} /> {t.profileHeader || "Verified Skill Passport"}
+                            </span>
+                          </div>
+                          <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "14px" }}>
+                            {workerProfileDetails.email} · ID: #{workerProfileDetails.userId || workerProfileDetails.id || currentUser.id} · {t.jobSeeker || "Job Seeker"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <button
+                          className="button secondary small"
+                          onClick={() => setProgressSubTab("applications")}
+                        >
+                          <ArrowLeft size={14} /> {t.backToListBtn || "Back to Applications"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="worker-details-grid">
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">{t.tradeTitle || "Trade / Occupation"}</span>
+                        <p className="worker-detail-val">{localizedOccupation || workerProfileDetails.occupation || "Specialist"}</p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">{t.experienceTitle || "Experience"}</span>
+                        <p className="worker-detail-val">
+                          {workerProfileDetails.experienceYears
+                            ? `${workerProfileDetails.experienceYears} Years`
+                            : "Experienced"}
+                        </p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">{t.salaryTitle || "Expected Salary"}</span>
+                        <p className="worker-detail-val">
+                          {workerProfileDetails.expectedSalaryMin
+                            ? `₹${Number(workerProfileDetails.expectedSalaryMin).toLocaleString()}/mo`
+                            : "Market Standard"}
+                        </p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">{t.locationTitle || "Location & Shift"}</span>
+                        <p className="worker-detail-val">
+                          {workerProfileDetails.location || "Pune"} · {workerProfileDetails.preferredShift || "Day"} shift
+                        </p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">{t.languageTitle || "Primary Language"}</span>
+                        <p className="worker-detail-val">{workerProfileDetails.language || "Hindi"}</p>
+                      </div>
+                    </div>
+
+                    <div className="worker-detail-skills">
+                      <span className="worker-detail-label">{t.skillsTitle || "Verified Skills"}</span>
+                      <div className="skills-tags-wrap">
+                        {Array.isArray(workerProfileDetails.skills) && workerProfileDetails.skills.length > 0 ? (
+                          workerProfileDetails.skills.map((skill, sIdx) => (
+                            <span key={sIdx} className="skill-tag-pill">
+                              <Check size={13} />
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: "13px" }}>Technical Trade Skills</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {Array.isArray(workerProfileDetails.employmentHistory) &&
+                      workerProfileDetails.employmentHistory.length > 0 && (
+                        <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--line)" }}>
+                          <span className="worker-detail-label">{t.employmentHistoryTitle || "Employment History"}</span>
+                          <div style={{ display: "grid", gap: "10px", marginTop: "10px" }}>
+                            {workerProfileDetails.employmentHistory.map((hist, hIdx) => (
+                              <div
+                                key={hIdx}
+                                style={{
+                                  background: "#f9faf8",
+                                  border: "1px solid var(--line)",
+                                  borderRadius: "8px",
+                                  padding: "12px 16px",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <div>
+                                  <strong>{typeof hist === "string" ? hist : hist.role || "Technician"}</strong>
+                                  {typeof hist === "object" && hist.company && (
+                                    <span style={{ color: "var(--muted)", marginLeft: "8px", fontSize: "13px" }}>
+                                      at {hist.company}
+                                    </span>
+                                  )}
+                                </div>
+                                {typeof hist === "object" && hist.duration && (
+                                  <span className="tag">{hist.duration}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                ) : (
+                  <div className="empty-state">No profile details loaded yet.</div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -1648,12 +2394,36 @@ function Employer() {
   const navigate = useNavigate();
   const [currentUser] = useState(getStoredUser);
   const [activeTab, setActiveTab] = useState("jobs"); // "jobs" | "candidates"
+  const [candidateSubTab, setCandidateSubTab] = useState("list"); // "list" | "details"
+  const [selectedWorkerId, setSelectedWorkerId] = useState(null);
+  const [selectedWorkerDetails, setSelectedWorkerDetails] = useState(null);
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [loadingWorkerDetails, setLoadingWorkerDetails] = useState(false);
+  const [workerDetailsError, setWorkerDetailsError] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPostJob, setShowPostJob] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [editingJobId, setEditingJobId] = useState(null);
+  const [editingOpenings, setEditingOpenings] = useState("");
+
+  const fetchAndShowWorkerDetails = async (app) => {
+    setSelectedApp(app);
+    setSelectedWorkerId(app.worker_id);
+    setCandidateSubTab("details");
+    setLoadingWorkerDetails(true);
+    setWorkerDetailsError(null);
+    try {
+      const res = await apiRequest(`/workers/${app.worker_id}`);
+      setSelectedWorkerDetails(res.data || res.worker || null);
+    } catch (err) {
+      setWorkerDetailsError(err.message || "Failed to load worker profile from database");
+    } finally {
+      setLoadingWorkerDetails(false);
+    }
+  };
 
   // New Job Form State
   const [jobTitle, setJobTitle] = useState("");
@@ -1663,7 +2433,7 @@ function Employer() {
   const [jobOpenings, setJobOpenings] = useState(2);
   const [jobExp, setJobExp] = useState(2);
 
-  const employerId = currentUser?.role === "employer" ? currentUser.profileId : 1;
+  const employerId = currentUser?.id || 501;
 
   const loadData = async (showSpinner = false) => {
     if (showSpinner) {
@@ -1672,7 +2442,7 @@ function Employer() {
     try {
       const [jobsRes, appsRes] = await Promise.all([
         apiRequest(`/jobs?employer_id=${employerId}`),
-        apiRequest("/applications"),
+        apiRequest(`/applications?employer_id=${employerId}`),
       ]);
       setJobs(jobsRes.data || []);
       setApplications(appsRes.data || []);
@@ -1686,7 +2456,7 @@ function Employer() {
   useEffect(() => {
     const user = getStoredUser();
     if (!user) {
-      navigate("/login?role=employer");
+      navigate("/login/employer");
       return undefined;
     }
     if (user.role !== "employer") {
@@ -1696,8 +2466,8 @@ function Employer() {
 
     let isMounted = true;
     Promise.all([
-      apiRequest(`/jobs?employer_id=${employerId}`),
-      apiRequest("/applications"),
+      apiRequest(`/jobs?employer_id=${user.id || 501}`),
+      apiRequest(`/applications?employer_id=${user.id || 501}`),
     ])
       .then(([jobsRes, appsRes]) => {
         if (!isMounted) return;
@@ -1715,7 +2485,7 @@ function Employer() {
     return () => {
       isMounted = false;
     };
-  }, [employerId, navigate]);
+  }, [navigate]);
 
   const handleHire = async (app) => {
     try {
@@ -1724,11 +2494,99 @@ function Employer() {
       setBanner({
         type: "success",
         title: `Candidate Hired: ${app.worker_name}!`,
-        message: `${app.worker_name} is hired for "${app.job_title}". ${res.withdrawnCount > 0 ? `${res.withdrawnCount} other open application(s) for this candidate were automatically withdrawn!` : "Worker availability set to unavailable."}`,
+        message: `${app.worker_name} is hired for "${app.job_title}". ${res.withdrawnCount > 0 ? `${res.withdrawnCount} other open application(s) for this candidate were automatically withdrawn!` : ""}`,
       });
+      setSelectedApp((prev) => (prev && prev.id === app.id ? { ...prev, status: "Selected" } : prev));
       await loadData();
     } catch (err) {
       setBanner({ type: "error", title: "Action Failed", message: err.message });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRevoke = async (app) => {
+    try {
+      setActionLoading(app.id);
+      await apiRequest(`/applications/${app.id}/revoke`, { method: "POST" });
+      setBanner({
+        type: "info",
+        title: `Selection Revoked: ${app.worker_name}`,
+        message: `Candidate selection for "${app.job_title}" was revoked. Opening has been restored.`,
+      });
+      setSelectedApp((prev) => (prev && prev.id === app.id ? { ...prev, status: "Applied" } : prev));
+      await loadData();
+    } catch (err) {
+      setBanner({ type: "error", title: "Revoke Failed", message: err.message });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async (app) => {
+    try {
+      setActionLoading(app.id);
+      await apiRequest(`/applications/${app.id}/reject`, { method: "POST" });
+      setBanner({
+        type: "info",
+        title: `Candidate Rejected: ${app.worker_name}`,
+        message: `Application for "${app.job_title}" was rejected and marked as withdrawn.`,
+      });
+      setSelectedApp((prev) => (prev && prev.id === app.id ? { ...prev, status: "Rejected" } : prev));
+      await loadData();
+    } catch (err) {
+      setBanner({ type: "error", title: "Reject Failed", message: err.message });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleStartEditOpenings = (job) => {
+    setEditingJobId(job.id);
+    setEditingOpenings(job.openings != null ? job.openings : 1);
+  };
+
+  const handleSaveOpenings = async (jobId) => {
+    const num = Math.max(0, parseInt(editingOpenings, 10) || 0);
+    try {
+      setActionLoading(`save-${jobId}`);
+      const res = await apiRequest(`/jobs/${jobId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ openings: num }),
+      });
+      const updatedJob = res.data || res.job;
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, openings: updatedJob.openings } : j))
+      );
+      setEditingJobId(null);
+      setBanner({
+        type: "success",
+        title: "Vacancies Updated!",
+        message: `Number of vacancies for "${updatedJob.title}" updated to ${updatedJob.openings}.`,
+      });
+    } catch (err) {
+      setBanner({ type: "error", title: "Update Failed", message: err.message });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteJob = async (job) => {
+    if (!window.confirm(`Are you sure you want to remove the job opening "${job.title}"? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      setActionLoading(`del-${job.id}`);
+      await apiRequest(`/jobs/${job.id}`, { method: "DELETE" });
+      setJobs((prev) => prev.filter((j) => j.id !== job.id));
+      setBanner({
+        type: "info",
+        title: "Job Opening Removed",
+        message: `"${job.title}" was removed from your active openings.`,
+      });
+      await loadData();
+    } catch (err) {
+      setBanner({ type: "error", title: "Failed to remove job", message: err.message });
     } finally {
       setActionLoading(null);
     }
@@ -1740,15 +2598,15 @@ function Employer() {
       await apiRequest("/jobs", {
         method: "POST",
         body: JSON.stringify({
-          employerId: currentUser.profileId,
-          companyName: currentUser.companyName,
+          employerId: currentUser.id || 501,
+          companyName: currentUser.name || "Employer Company",
           title: jobTitle,
           description: jobDesc,
           location: currentUser.location || "Pune",
-          salaryMin: jobSalaryMin,
-          salaryMax: jobSalaryMax,
-          requiredExperience: jobExp,
-          openings: jobOpenings,
+          salaryMin: Number(jobSalaryMin),
+          salaryMax: Number(jobSalaryMax),
+          requiredExperience: Number(jobExp),
+          openings: Number(jobOpenings),
         }),
       });
 
@@ -1792,8 +2650,8 @@ function Employer() {
         <div className="dashboard-topbar">
           <div>
             <span className="step-label">EMPLOYER PORTAL</span>
-            <h1>{currentUser.companyName || "Employer Dashboard"}</h1>
-            <p>Welcome back, <strong>{currentUser.name}</strong> · Location: {currentUser.location || "Pune"}</p>
+            <h1>{currentUser.name || "Employer Dashboard"}</h1>
+            <p>Welcome back, <strong>{currentUser.name}</strong> (User ID: {currentUser.id}) · Location: {currentUser.location || "Pune"}</p>
           </div>
           <div className="dashboard-actions">
             <button
@@ -1922,15 +2780,87 @@ function Employer() {
                       <h3>{job.title}</h3>
                       <p>{job.description}</p>
                     </div>
-                    <span className="badge badge-applied" style={{ fontSize: "13px" }}>
-                      {job.openings > 0 ? `${job.openings} Openings Remaining` : "Filled"}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <span className="badge badge-applied" style={{ fontSize: "13px" }}>
+                        {job.openings > 0 ? `${job.openings} Openings Remaining` : "Filled"}
+                      </span>
+                      <button
+                        type="button"
+                        className="button secondary small"
+                        onClick={() => handleStartEditOpenings(job)}
+                        title="Edit number of vacancies"
+                      >
+                        <Edit2 size={13} /> Edit Vacancies
+                      </button>
+                      <button
+                        type="button"
+                        className="button danger-outline small"
+                        disabled={actionLoading === `del-${job.id}`}
+                        onClick={() => handleDeleteJob(job)}
+                        title="Remove this job opening"
+                      >
+                        <Trash2 size={13} /> {actionLoading === `del-${job.id}` ? "Removing..." : "Remove"}
+                      </button>
+                    </div>
                   </div>
+
+                  {editingJobId === job.id && (
+                    <div
+                      className="vacancy-edit-box"
+                      style={{
+                        background: "#f6f9f5",
+                        border: "1px solid #c9d8c5",
+                        borderRadius: "8px",
+                        padding: "12px 16px",
+                        margin: "10px 0 14px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <label style={{ fontSize: "13px", fontWeight: "600", color: "var(--ink)" }}>
+                        Openings / Vacancies:
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editingOpenings}
+                        onChange={(e) => setEditingOpenings(e.target.value)}
+                        style={{
+                          width: "90px",
+                          padding: "6px 10px",
+                          borderRadius: "6px",
+                          border: "1px solid #cfd7cd",
+                          fontSize: "14px",
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="button primary small"
+                        disabled={actionLoading === `save-${job.id}`}
+                        onClick={() => handleSaveOpenings(job.id)}
+                      >
+                        <Check size={13} /> {actionLoading === `save-${job.id}` ? "Saving..." : "Save Vacancies"}
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary small"
+                        onClick={() => setEditingJobId(null)}
+                      >
+                        <X size={13} /> Cancel
+                      </button>
+                    </div>
+                  )}
+
                   <div className="job-tags">
                     <span className="tag">📍 {job.location}</span>
                     <span className="tag">💰 ₹{job.salary_min?.toLocaleString()} - ₹{job.salary_max?.toLocaleString()}/mo</span>
                     <span className="tag">⏱️ {job.shift || "day"} shift</span>
-                    <span className="tag">🛠️ {job.required_experience} yrs min exp</span>
+                    <span className="tag">
+                      🛠️ {Math.round(Number(job.experience_required != null ? job.experience_required : (job.required_experience != null ? job.required_experience : (job.requiredExperience != null ? job.requiredExperience : 0))))} yrs min exp
+                    </span>
                   </div>
                 </div>
               ))
@@ -1938,59 +2868,377 @@ function Employer() {
           </div>
         ) : (
           /* TAB 2: Candidate Applications */
-          <div className="candidate-grid">
-            {applications.map((app) => {
-              const isHired = app.status === "hired";
-              const isWithdrawn = app.status === "withdrawn";
-              const canHire = ["applied", "shortlisted"].includes(app.status);
+          <div>
+            <div className="subtab-bar">
+              <button
+                className={`subtab-btn ${candidateSubTab === "list" ? "active" : ""}`}
+                onClick={() => setCandidateSubTab("list")}
+              >
+                <User size={15} /> All Candidates ({applications.length})
+              </button>
+              <button
+                className={`subtab-btn ${candidateSubTab === "details" ? "active" : ""}`}
+                onClick={() => {
+                  setCandidateSubTab("details");
+                  if (!selectedWorkerDetails && applications.length > 0) {
+                    fetchAndShowWorkerDetails(applications[0]);
+                  }
+                }}
+              >
+                <BadgeCheck size={15} /> Worker Details {selectedWorkerDetails ? `(${selectedWorkerDetails.name})` : ""}
+              </button>
+            </div>
 
-              return (
-                <div
-                  key={app.id}
-                  className={`app-card ${isHired ? "is-hired" : ""} ${isWithdrawn ? "is-withdrawn" : ""}`}
-                >
-                  <div className="app-card-left">
-                    <div className="app-avatar">{app.worker_name ? app.worker_name[0] : "W"}</div>
-                    <div className="app-info">
-                      <h3>
-                        {app.worker_name}
-                        {app.is_available !== false ? (
-                          <span className="availability-pill avail">Available</span>
-                        ) : (
-                          <span className="availability-pill unavail">Unavailable / Employed</span>
-                        )}
-                      </h3>
-                      <div className="app-meta">
-                        <span><BriefcaseBusiness size={14} /> Applied for: <strong>{app.job_title}</strong></span>
-                        <span><Building2 size={14} /> {app.company_name}</span>
+            {candidateSubTab === "list" ? (
+              <div className="candidate-grid">
+                {applications.length === 0 ? (
+                  <div className="empty-state">No candidate applications received yet for your job openings.</div>
+                ) : (
+                  applications.map((app) => {
+                    const status = app.status || "Applied";
+                    const isHired = status === "Selected" || status.toLowerCase() === "hired";
+                    const isRejected = status === "Rejected" || status.toLowerCase() === "rejected";
+                    const isWithdrawn = status === "Withdrawn" || status.toLowerCase() === "withdrawn";
+                    const canHire = ["Applied", "Shortlisted", "applied", "shortlisted"].includes(status);
+
+                    return (
+                      <div
+                        key={app.id}
+                        className={`app-card ${isHired ? "is-hired" : ""} ${isWithdrawn || isRejected ? "is-withdrawn" : ""}`}
+                      >
+                        <div className="app-card-left">
+                          <div className="app-avatar">{app.worker_name ? app.worker_name[0] : "W"}</div>
+                          <div className="app-info">
+                            <h3>
+                              {app.worker_name}
+                              {app.occupation && (
+                                <span style={{ fontSize: "13px", fontWeight: "normal", color: "var(--muted)", marginLeft: "8px" }}>
+                                  · {app.occupation} ({app.experience_years ? `${app.experience_years} yrs exp` : "Experienced"})
+                                </span>
+                              )}
+                            </h3>
+                            <div className="app-meta">
+                              <span><BriefcaseBusiness size={14} /> Applied for: <strong>{app.job_title}</strong></span>
+                              <span><Building2 size={14} /> {app.company_name}</span>
+                              {app.worker_location && (
+                                <span><MapPin size={14} /> {app.worker_location}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="app-card-right">
+                          {isHired ? (
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                              <span className="badge badge-shortlisted">
+                                <BadgeCheck size={14} />
+                                Selected (Hired)
+                              </span>
+                              <button
+                                className="cross-revoke-icon"
+                                disabled={actionLoading === app.id}
+                                onClick={() => handleRevoke(app)}
+                                title="Revoke candidate selection"
+                                aria-label="Revoke candidate selection"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : isRejected ? (
+                            <span className="badge badge-rejected-red">
+                              <X size={14} /> Withdrawn
+                            </span>
+                          ) : (
+                            <span className={`badge badge-${isWithdrawn ? "withdrawn" : "applied"}`}>
+                              {isWithdrawn && <X size={14} />}
+                              {status}
+                            </span>
+                          )}
+
+                          <button
+                            className="button secondary small"
+                            onClick={() => fetchAndShowWorkerDetails(app)}
+                          >
+                            Details
+                          </button>
+
+                          {canHire ? (
+                            <>
+                              <button
+                                className="button danger-outline small"
+                                disabled={actionLoading === app.id}
+                                onClick={() => handleReject(app)}
+                                title="Reject candidate"
+                              >
+                                <X size={14} /> Reject
+                              </button>
+                              <button
+                                className="button primary small"
+                                disabled={actionLoading === app.id}
+                                onClick={() => handleHire(app)}
+                              >
+                                {actionLoading === app.id ? "Processing..." : "Hire Candidate"}
+                              </button>
+                            </>
+                          ) : (
+                            <button className="button quiet small" disabled>
+                              {isHired ? "Hired" : "Withdrawn"}
+                            </button>
+                          )}
+                        </div>
                       </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              /* DETAILS SUBTAB: Worker Details from Database */
+              <div className="worker-details-view">
+                {applications.length > 1 && (
+                  <div className="candidate-selector-bar">
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--muted)", marginRight: "4px" }}>
+                      Select Candidate:
+                    </span>
+                    {applications.map((app) => (
+                      <button
+                        key={app.id}
+                        className={`candidate-select-chip ${selectedWorkerId === app.worker_id ? "active" : ""}`}
+                        onClick={() => fetchAndShowWorkerDetails(app)}
+                      >
+                        {app.worker_name} · {app.job_title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {loadingWorkerDetails ? (
+                  <div className="empty-state">
+                    <Sparkles size={26} style={{ color: "var(--green)", marginBottom: "8px" }} />
+                    <p style={{ margin: 0, fontWeight: "600" }}>Fetching worker profile details from database...</p>
+                  </div>
+                ) : workerDetailsError ? (
+                  <div className="banner error">
+                    <AlertCircle size={22} />
+                    <div>
+                      <strong>Failed to load worker profile</strong>
+                      <span>{workerDetailsError}</span>
                     </div>
                   </div>
+                ) : selectedWorkerDetails ? (
+                  <div className="worker-details-card">
+                    <div className="worker-details-header">
+                      <div className="worker-details-main">
+                        <div className="worker-avatar-large">
+                          {selectedWorkerDetails.name ? selectedWorkerDetails.name[0] : "W"}
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                            <h2 style={{ margin: 0, fontSize: "22px" }}>{selectedWorkerDetails.name}</h2>
+                            <span className="badge badge-applied" style={{ fontSize: "12px" }}>
+                              <BadgeCheck size={14} /> Verified Skill Passport
+                            </span>
+                          </div>
+                          <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: "14px" }}>
+                            {selectedWorkerDetails.email} · Worker ID: #{selectedWorkerDetails.userId} · Role: {selectedWorkerDetails.role}
+                          </p>
+                        </div>
+                      </div>
 
-                  <div className="app-card-right">
-                    <span className={`badge badge-${app.status}`}>
-                      {isHired && <BadgeCheck size={14} />}
-                      {isWithdrawn && <X size={14} />}
-                      {app.status === "withdrawn" ? "Withdrawn (Hired elsewhere)" : app.status}
-                    </span>
+                      <div>
+                        <button
+                          className="button secondary small"
+                          onClick={() => setCandidateSubTab("list")}
+                        >
+                          <ArrowLeft size={14} /> Back to Candidates List
+                        </button>
+                      </div>
+                    </div>
 
-                    {canHire ? (
-                      <button
-                        className="button primary small"
-                        disabled={actionLoading === app.id}
-                        onClick={() => handleHire(app)}
+                    {/* Applied Job Info Banner */}
+                    {selectedApp && (
+                      <div
+                        style={{
+                          background: "#f4f8f2",
+                          border: "1px solid #d2e4ce",
+                          borderRadius: "10px",
+                          padding: "16px 20px",
+                          margin: "22px 0",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: "14px",
+                        }}
                       >
-                        {actionLoading === app.id ? "Processing..." : "Hire Candidate"}
-                      </button>
-                    ) : (
-                      <button className="button quiet small" disabled>
-                        {isHired ? "Hired" : "Withdrawn"}
-                      </button>
+                        <div>
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.7px",
+                              color: "var(--green)",
+                            }}
+                          >
+                            Application Context
+                          </div>
+                          <div style={{ fontSize: "16px", fontWeight: "700", marginTop: "2px" }}>
+                            {selectedApp.job_title} · {selectedApp.company_name}
+                          </div>
+                          {selectedApp.applied_at && (
+                            <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px" }}>
+                              Applied on: {new Date(selectedApp.applied_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                          {selectedApp.status === "Selected" || selectedApp.status?.toLowerCase() === "hired" ? (
+                            <>
+                              <span className="badge badge-shortlisted">
+                                <BadgeCheck size={14} /> Selected (Hired)
+                              </span>
+                              <button
+                                className="button revoke-btn small"
+                                disabled={actionLoading === selectedApp.id}
+                                onClick={() => handleRevoke(selectedApp)}
+                                title="Revoke candidate selection"
+                              >
+                                <X size={14} /> Revoke Selection
+                              </button>
+                            </>
+                          ) : selectedApp.status === "Rejected" || selectedApp.status?.toLowerCase() === "rejected" ? (
+                            <span className="badge badge-rejected-red">
+                              <X size={14} /> Withdrawn
+                            </span>
+                          ) : (
+                            <span
+                              className={`badge badge-${
+                                selectedApp.status === "Withdrawn" || selectedApp.status?.toLowerCase() === "withdrawn"
+                                  ? "withdrawn"
+                                  : "applied"
+                              }`}
+                            >
+                              {selectedApp.status === "Withdrawn" && <X size={14} />}
+                              {selectedApp.status}
+                            </span>
+                          )}
+
+                          {["Applied", "Shortlisted", "applied", "shortlisted"].includes(selectedApp.status) && (
+                            <>
+                              <button
+                                className="button danger-outline small"
+                                disabled={actionLoading === selectedApp.id}
+                                onClick={() => handleReject(selectedApp)}
+                                title="Reject candidate"
+                              >
+                                <X size={14} /> Reject
+                              </button>
+                              <button
+                                className="button primary small"
+                                disabled={actionLoading === selectedApp.id}
+                                onClick={() => handleHire(selectedApp)}
+                              >
+                                {actionLoading === selectedApp.id ? "Processing..." : "Hire Candidate"}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     )}
+
+                    {/* Key Attributes Grid */}
+                    <div className="worker-details-grid">
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">Trade / Occupation</span>
+                        <p className="worker-detail-val">{selectedWorkerDetails.occupation || "Specialist"}</p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">Experience</span>
+                        <p className="worker-detail-val">
+                          {selectedWorkerDetails.experienceYears
+                            ? `${selectedWorkerDetails.experienceYears} Years`
+                            : "Experienced"}
+                        </p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">Expected Salary</span>
+                        <p className="worker-detail-val">
+                          {selectedWorkerDetails.expectedSalaryMin
+                            ? `₹${Number(selectedWorkerDetails.expectedSalaryMin).toLocaleString()}/mo`
+                            : "Market Standard"}
+                        </p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">Location & Shift</span>
+                        <p className="worker-detail-val">
+                          {selectedWorkerDetails.location || "Pune"} · {selectedWorkerDetails.preferredShift || "Day"} shift
+                        </p>
+                      </div>
+                      <div className="worker-detail-item">
+                        <span className="worker-detail-label">Primary Language</span>
+                        <p className="worker-detail-val">{selectedWorkerDetails.language || "Hindi"}</p>
+                      </div>
+                    </div>
+
+                    {/* Verified Skills */}
+                    <div className="worker-detail-skills">
+                      <span className="worker-detail-label">Verified Skill Competencies</span>
+                      <div className="skills-tags-wrap">
+                        {Array.isArray(selectedWorkerDetails.skills) && selectedWorkerDetails.skills.length > 0 ? (
+                          selectedWorkerDetails.skills.map((skill, sIdx) => (
+                            <span key={sIdx} className="skill-tag-pill">
+                              <Check size={13} />
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: "13px" }}>General Technical Trade Skills</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Employment History */}
+                    {Array.isArray(selectedWorkerDetails.employmentHistory) &&
+                      selectedWorkerDetails.employmentHistory.length > 0 && (
+                        <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--line)" }}>
+                          <span className="worker-detail-label">Verified Employment History</span>
+                          <div style={{ display: "grid", gap: "10px", marginTop: "10px" }}>
+                            {selectedWorkerDetails.employmentHistory.map((hist, hIdx) => (
+                              <div
+                                key={hIdx}
+                                style={{
+                                  background: "#f9faf8",
+                                  border: "1px solid var(--line)",
+                                  borderRadius: "8px",
+                                  padding: "12px 16px",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <div>
+                                  <strong>{typeof hist === "string" ? hist : hist.role || "Technician"}</strong>
+                                  {typeof hist === "object" && hist.company && (
+                                    <span style={{ color: "var(--muted)", marginLeft: "8px", fontSize: "13px" }}>
+                                      at {hist.company}
+                                    </span>
+                                  )}
+                                </div>
+                                {typeof hist === "object" && hist.duration && (
+                                  <span className="tag">{hist.duration}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                   </div>
-                </div>
-              );
-            })}
+                ) : (
+                  <div className="empty-state">Select a candidate to view their verified database profile.</div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </main>
