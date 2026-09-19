@@ -1,4 +1,28 @@
 import { getJobs } from "./jobService.js";
+import { getWorkerProfile } from "./workerService.js";
+import { calculateDistanceKm, roundedDistanceKm } from "./distanceService.js";
+
+const CITY_COORDINATES = {
+  pune: { latitude: 18.5204, longitude: 73.8567 },
+  mumbai: { latitude: 19.0760, longitude: 72.8777 },
+  chennai: { latitude: 13.0827, longitude: 80.2707 },
+  vellore: { latitude: 12.9165, longitude: 79.1325 },
+  katpadi: { latitude: 12.9707, longitude: 79.1637 },
+  bengaluru: { latitude: 12.9716, longitude: 77.5946 },
+  bangalore: { latitude: 12.9716, longitude: 77.5946 },
+  delhi: { latitude: 28.6139, longitude: 77.2090 },
+  "new delhi": { latitude: 28.6139, longitude: 77.2090 },
+  hyderabad: { latitude: 17.3850, longitude: 78.4867 },
+  ahmedabad: { latitude: 23.0225, longitude: 72.5714 },
+  kochi: { latitude: 9.9312, longitude: 76.2673 },
+  patna: { latitude: 25.5941, longitude: 85.1376 },
+  mysuru: { latitude: 12.2958, longitude: 76.6394 },
+  bhubaneswar: { latitude: 20.2961, longitude: 85.8245 },
+  coimbatore: { latitude: 11.0168, longitude: 76.9558 },
+  lucknow: { latitude: 26.8467, longitude: 80.9462 },
+  jaipur: { latitude: 26.9084, longitude: 75.7953 },
+  ranipet: { latitude: 12.9309, longitude: 79.3373 },
+};
 
 const fields = ["occupation", "skills", "experience_years", "location", "expected_salary_min", "preferred_shift"];
 const occupations = ["welder", "electrician", "plumber", "carpenter", "painter", "mason", "driver", "helper", "operator"];
@@ -85,15 +109,86 @@ export function startVoiceJobSearch(language = "en-IN") {
   return { search, nextQuestion: (questionText[language] || questionText["en-IN"]).occupation, isComplete: false };
 }
 
-export async function continueVoiceJobSearch({ answer, search, language = "en-IN" }) {
+export async function continueVoiceJobSearch({
+  answer,
+  search,
+  language = "en-IN",
+  workerId,
+  latitude,
+  longitude,
+  location,
+}) {
   const next = extract(answer, search || {});
   const nextField = fields.find((field) => field === "skills" ? !next.skills?.length : next[field] == null);
   if (nextField) {
     next._asked = nextField;
     return { search: next, nextQuestion: questionFor(nextField, next, language), isComplete: false };
   }
-  const { data: jobs } = await getJobs({ open_only: true, limit: 50 });
-  const matches = jobs.map((job) => scoreJob(job, next)).filter((match) => match.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore);
+
+  // Determine reference coordinates for distance calculations
+  let workerLat = Number.isFinite(Number(latitude)) ? Number(latitude) : null;
+  let workerLon = Number.isFinite(Number(longitude)) ? Number(longitude) : null;
+
+  if ((workerLat === null || workerLon === null) && workerId) {
+    try {
+      const profile = await getWorkerProfile(workerId);
+      if (Number.isFinite(Number(profile?.latitude)) && Number.isFinite(Number(profile?.longitude))) {
+        workerLat = Number(profile.latitude);
+        workerLon = Number(profile.longitude);
+      } else if (profile?.location) {
+        const cityKey = profile.location.toLowerCase().trim();
+        if (CITY_COORDINATES[cityKey]) {
+          workerLat = CITY_COORDINATES[cityKey].latitude;
+          workerLon = CITY_COORDINATES[cityKey].longitude;
+        }
+      }
+    } catch {
+      // Profile lookup is non-blocking
+    }
+  }
+
+  if ((workerLat === null || workerLon === null) && (location || next.location)) {
+    const locKey = String(location || next.location).toLowerCase().trim();
+    if (CITY_COORDINATES[locKey]) {
+      workerLat = CITY_COORDINATES[locKey].latitude;
+      workerLon = CITY_COORDINATES[locKey].longitude;
+    }
+  }
+
+  const { data: jobs } = await getJobs({
+    open_only: true,
+    unique: true,
+    limit: 50,
+    latitude: workerLat,
+    longitude: workerLon,
+    order_by: workerLat !== null && workerLon !== null ? "distance" : undefined,
+  });
+
+  const matches = jobs
+    .map((job) => {
+      let dist = job.distance_km;
+      if (
+        !Number.isFinite(dist) &&
+        workerLat !== null &&
+        workerLon !== null &&
+        Number.isFinite(Number(job.latitude)) &&
+        Number.isFinite(Number(job.longitude))
+      ) {
+        const raw = calculateDistanceKm(workerLat, workerLon, Number(job.latitude), Number(job.longitude));
+        dist = roundedDistanceKm(raw);
+      }
+      const jobWithDist = { ...job, distance_km: dist };
+      return scoreJob(jobWithDist, next);
+    })
+    .filter((match) => match.matchScore > 0);
+
+  matches.sort((a, b) => {
+    const aDist = Number.isFinite(a.job.distance_km) ? a.job.distance_km : Infinity;
+    const bDist = Number.isFinite(b.job.distance_km) ? b.job.distance_km : Infinity;
+    if (aDist !== bDist) return aDist - bDist; // Ascending distance (least to max distance)
+    return b.matchScore - a.matchScore; // Higher suitability first when distance is equal
+  });
+
   delete next._asked;
   return { search: next, nextQuestion: null, isComplete: true, matches };
 }

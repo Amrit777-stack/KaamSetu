@@ -31,7 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { apiRequest } from "./services/api.js";
-import { captureAndSaveWorkerLocation } from "./services/workerLocation.js";
+import { captureAndSaveWorkerLocation, calculateDistanceKm, KNOWN_CITY_COORDINATES } from "./services/workerLocation.js";
 import {
   prefetchQuestionTranslations,
   translateQuestion,
@@ -1674,10 +1674,36 @@ function WorkerDashboard() {
     try {
       const result = await apiRequest("/voice-job-search/turn", {
         method: "POST",
-        body: JSON.stringify({ answer: voiceSearchNormalizedAnswer || finalAnswer, search: voiceSearch, language: currentLang }),
+        body: JSON.stringify({
+          answer: voiceSearchNormalizedAnswer || finalAnswer,
+          search: voiceSearch,
+          language: currentLang,
+          workerId: currentUser?.id,
+          latitude: currentUser?.latitude,
+          longitude: currentUser?.longitude,
+          location: currentUser?.location,
+        }),
       });
       if (result.isComplete) {
-        setAvailableJobs((result.matches || []).map((match) => ({ ...match.job, voiceMatch: match })));
+        const jobsWithDist = (result.matches || []).map((match) => {
+          let dist = match.job?.distance_km;
+          if (
+            !Number.isFinite(dist) &&
+            Number.isFinite(currentUser?.latitude) &&
+            Number.isFinite(currentUser?.longitude) &&
+            Number.isFinite(match.job?.latitude) &&
+            Number.isFinite(match.job?.longitude)
+          ) {
+            dist = calculateDistanceKm(
+              currentUser.latitude,
+              currentUser.longitude,
+              match.job.latitude,
+              match.job.longitude
+            );
+          }
+          return { ...match.job, distance_km: dist, voiceMatch: match };
+        });
+        setAvailableJobs(jobsWithDist);
         setBanner({ type: "success", title: "Jobs found", message: `${result.matches?.length || 0} matching jobs found for your voice search.` });
         handleCloseVoiceApply();
       } else {
@@ -1791,6 +1817,17 @@ function WorkerDashboard() {
       (job) => job && (job.openings == null || Number(job.openings) > 0) && job.status !== "closed"
     );
 
+    // Determine worker coordinates or fallback city coordinates
+    let userLat = Number.isFinite(currentUser?.latitude) ? currentUser.latitude : null;
+    let userLon = Number.isFinite(currentUser?.longitude) ? currentUser.longitude : null;
+    if ((userLat === null || userLon === null) && currentUser?.location) {
+      const cityCoords = KNOWN_CITY_COORDINATES[currentUser.location.toLowerCase().trim()];
+      if (cityCoords) {
+        userLat = cityCoords.latitude;
+        userLon = cityCoords.longitude;
+      }
+    }
+
     for (const job of validJobs) {
       const normTitle = (job.title || "").trim().toLowerCase();
       const normCompany = (job.company_name || "").trim().toLowerCase();
@@ -1799,7 +1836,20 @@ function WorkerDashboard() {
       if (!seen.has(key) && !seen.has(Number(job.id))) {
         seen.add(key);
         seen.add(Number(job.id));
-        unique.push(job);
+
+        // If distance_km is not finite but coordinates are available, compute it
+        let distanceKm = job.distance_km;
+        if (
+          !Number.isFinite(distanceKm) &&
+          userLat !== null &&
+          userLon !== null &&
+          Number.isFinite(job.latitude) &&
+          Number.isFinite(job.longitude)
+        ) {
+          distanceKm = calculateDistanceKm(userLat, userLon, job.latitude, job.longitude);
+        }
+
+        unique.push(distanceKm !== job.distance_km ? { ...job, distance_km: distanceKm } : job);
       }
     }
 
@@ -1829,7 +1879,7 @@ function WorkerDashboard() {
 
       return 0;
     });
-  }, [availableJobs, currentUser.occupation]);
+  }, [availableJobs, currentUser.occupation, currentUser.latitude, currentUser.longitude, currentUser.location]);
 
   return (
     <div className="site-shell">

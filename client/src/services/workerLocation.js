@@ -2,6 +2,39 @@ import { apiRequest } from "./api.js";
 
 const GEO_OPTIONS = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
 
+export const KNOWN_CITY_COORDINATES = {
+  pune: { latitude: 18.5204, longitude: 73.8567 },
+  mumbai: { latitude: 19.0760, longitude: 72.8777 },
+  chennai: { latitude: 13.0827, longitude: 80.2707 },
+  vellore: { latitude: 12.9165, longitude: 79.1325 },
+  katpadi: { latitude: 12.9707, longitude: 79.1637 },
+  bengaluru: { latitude: 12.9716, longitude: 77.5946 },
+  bangalore: { latitude: 12.9716, longitude: 77.5946 },
+  delhi: { latitude: 28.6139, longitude: 77.2090 },
+  "new delhi": { latitude: 28.6139, longitude: 77.2090 },
+  hyderabad: { latitude: 17.3850, longitude: 78.4867 },
+  ahmedabad: { latitude: 23.0225, longitude: 72.5714 },
+  kochi: { latitude: 9.9312, longitude: 76.2673 },
+  patna: { latitude: 25.5941, longitude: 85.1376 },
+  mysuru: { latitude: 12.2958, longitude: 76.6394 },
+  bhubaneswar: { latitude: 20.2961, longitude: 85.8245 },
+  coimbatore: { latitude: 11.0168, longitude: 76.9558 },
+  lucknow: { latitude: 26.8467, longitude: 80.9462 },
+  jaipur: { latitude: 26.9084, longitude: 75.7953 },
+  ranipet: { latitude: 12.9309, longitude: 79.3373 },
+};
+
+export function calculateDistanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
+  const values = [latitudeA, longitudeA, latitudeB, longitudeB].map(Number);
+  if (!values.every(Number.isFinite)) return null;
+  const [latA, lonA, latB, lonB] = values.map((val) => (val * Math.PI) / 180);
+  const latDelta = latB - latA;
+  const lonDelta = lonB - lonA;
+  const haversine = Math.sin(latDelta / 2) ** 2 + Math.cos(latA) * Math.cos(latB) * Math.sin(lonDelta / 2) ** 2;
+  const dist = 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+  return dist < 10 ? Number(dist.toFixed(1)) : Math.round(dist);
+}
+
 function currentPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
