@@ -1,0 +1,37 @@
+.language-button {
+  padding: 9px 11px;
+  border: 1px solid #dbe3d6;
+  border-radius: 8px;
+  background: #f7faf3;
+  color: var(--green);
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.language-button:hover {
+  border-color: #98b29e;
+  background: #eef5e8;
+}
+
+.language-button:focus-within {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px #2064491a;
+}
+
+.language-button select {
+  appearance: none;
+  min-width: 86px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  outline: 0;
+}
+
+.language-button svg:last-child {
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}

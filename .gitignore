@@ -2,6 +2,8 @@ node_modules/
 dist/
 .env
 .env.local
+server/data/translation-cache.json
+server/data/voice-responses.json
 .venv/
 venv/
 __pycache__/

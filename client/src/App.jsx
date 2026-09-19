@@ -27,12 +27,21 @@ import {
   X,
 } from "lucide-react";
 import { apiRequest } from "./services/api.js";
+import {
+  prefetchQuestionTranslations,
+  translateQuestion,
+  speakText,
+} from "./services/questionSpeech.js";
+import { submitVoiceResponse } from "./services/voiceResponse.js";
 import "./App.css";
 
 const languages = [
-  { name: "हिंदी", english: "Hindi", code: "HI" },
-  { name: "English", english: "English", code: "EN" },
-  { name: "தமிழ்", english: "Tamil", code: "TA" },
+  { name: "हिंदी", english: "Hindi", code: "HI", languageCode: "hi-IN" },
+  { name: "English", english: "English", code: "EN", languageCode: "en-IN" },
+  { name: "தமிழ்", english: "Tamil", code: "TA", languageCode: "ta-IN" },
+  { name: "తెలుగు", english: "Telugu", code: "TE", languageCode: "te-IN" },
+  { name: "ಕನ್ನಡ", english: "Kannada", code: "KN", languageCode: "kn-IN" },
+  { name: "मराठी", english: "Marathi", code: "MR", languageCode: "mr-IN" },
 ];
 
 const questions = [
@@ -283,7 +292,30 @@ function ChooseRole() {
 
 function Language() {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState("हिंदी");
+  const [selected, setSelected] = useState(() => {
+    const saved = localStorage.getItem("kaamsetu_language");
+    return languages.find((language) => language.languageCode === saved)?.name || "हिंदी";
+  });
+
+  const chooseLanguage = (language) => {
+    setSelected(language.name);
+    localStorage.setItem("kaamsetu_language", language.languageCode);
+    prefetchQuestionTranslations(
+      questions.map((question) => question[1]),
+      language.languageCode
+    ).catch((error) => console.error("Question prefetch failed:", error));
+  };
+
+  const continueToOnboarding = () => {
+    const language = languages.find((item) => item.name === selected) || languages[0];
+    localStorage.setItem("kaamsetu_language", language.languageCode);
+    prefetchQuestionTranslations(
+      questions.map((question) => question[1]),
+      language.languageCode
+    ).catch((error) => console.error("Question prefetch failed:", error));
+    navigate("/onboarding");
+  };
+
   return (
     <div className="entry-shell">
       <Header back="/choose-role" />
@@ -291,23 +323,29 @@ function Language() {
         <span className="step-label">Step 2 of 3</span>
         <h1>Which language feels like home?</h1>
         <p className="entry-intro">We’ll guide you through every step in this language.</p>
+
         <div className="language-list">
           {languages.map((language) => (
             <button
               key={language.name}
               className={`language-option ${selected === language.name ? "active" : ""}`}
-              onClick={() => setSelected(language.name)}
+              onClick={() => chooseLanguage(language)}
             >
               <span className="lang-code">{language.code}</span>
               <span>
                 <b>{language.name}</b>
                 <small>{language.english}</small>
               </span>
-              {selected === language.name && <span className="selected-check"><Check size={16} /></span>}
+              {selected === language.name && (
+                <span className="selected-check">
+                  <Check size={16} />
+                </span>
+              )}
             </button>
           ))}
         </div>
-        <button className="button primary full" onClick={() => navigate("/onboarding")}>
+
+        <button className="button primary full" onClick={continueToOnboarding}>
           Continue in {selected} <ArrowRight size={18} />
         </button>
       </main>
@@ -322,19 +360,136 @@ function Onboarding() {
   const [listening, setListening] = useState(false);
   const [answer, setAnswer] = useState("");
   const [answers, setAnswers] = useState(["", "", ""]);
+  const [translatedQuestion, setTranslatedQuestion] = useState("");
+  const [translationError, setTranslationError] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [isSubmittingSpeech, setIsSubmittingSpeech] = useState(false);
+  const [speechError, setSpeechError] = useState("");
+  const [recorder, setRecorder] = useState(null);
 
-  const next = () => {
+  const preferredLanguageCode =
+    localStorage.getItem("kaamsetu_language") || "hi-IN";
+
+  const next = (overrideAnswer = "") => {
     const newAnswers = [...answers];
-    newAnswers[step] = answer.trim() || (step === 0 ? "Worker" : step === 1 ? "Technician" : "3 years");
+    newAnswers[step] =
+      overrideAnswer.trim() ||
+      answer.trim() ||
+      (step === 0 ? "Worker" : step === 1 ? "Technician" : "3 years");
     setAnswers(newAnswers);
 
     if (step < 2) {
       setStep(step + 1);
       setAnswer("");
+      setTranscript("");
       setListening(false);
+      setTranslatedQuestion("");
+      setTranslationError("");
+      setSpeechError("");
     } else {
-      // Pass the real entered name to welcome
-      navigate(`/welcome?name=${encodeURIComponent(newAnswers[0])}&occupation=${encodeURIComponent(newAnswers[1])}`);
+      navigate(
+        `/welcome?name=${encodeURIComponent(newAnswers[0])}&occupation=${encodeURIComponent(newAnswers[1])}`
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (mode !== "voice") return undefined;
+
+    let ignoreResult = false;
+    setTranslatedQuestion("");
+    setTranslationError("");
+
+    translateQuestion(questions[step][1], preferredLanguageCode)
+      .then((translation) => {
+        if (!ignoreResult) setTranslatedQuestion(translation);
+      })
+      .catch((error) => {
+        console.error("Question translation failed:", error);
+        if (!ignoreResult) {
+          setTranslationError(
+            "Translation could not be completed. Please try the next question."
+          );
+        }
+      });
+
+    return () => {
+      ignoreResult = true;
+    };
+  }, [mode, preferredLanguageCode, step]);
+
+  const playQuestion = async () => {
+    if (!translatedQuestion) return;
+
+    try {
+      setIsSpeaking(true);
+      await speakText(translatedQuestion, preferredLanguageCode);
+    } catch (error) {
+      console.error("Question TTS failed:", error);
+      setSpeechError("Could not play the question. You can still answer by speaking.");
+    } finally {
+      setIsSpeaking(false);
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (listening && recorder) {
+      recorder.stop();
+      return;
+    }
+
+    try {
+      setSpeechError("");
+      setTranscript("");
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setListening(false);
+        setRecorder(null);
+        setIsSubmittingSpeech(true);
+
+        try {
+          const audio = new Blob(chunks, {
+            type: mediaRecorder.mimeType || "audio/webm",
+          });
+
+          const record = await submitVoiceResponse(
+            audio,
+            ["name", "occupation", "experienceYears"][step]
+          );
+
+          const recognized = record.englishTranscript || record.transcript || "";
+          setTranscript(recognized);
+          setAnswer(recognized);
+
+          // Store the recognized response immediately so the next step
+          // keeps the worker's answer even before the Continue button.
+          const newAnswers = [...answers];
+          newAnswers[step] = recognized;
+          setAnswers(newAnswers);
+        } catch (error) {
+          console.error("Speech recognition failed:", error);
+          setSpeechError(error.message || "Speech recognition failed.");
+        } finally {
+          setIsSubmittingSpeech(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setRecorder(mediaRecorder);
+      setListening(true);
+    } catch (error) {
+      console.error("Microphone access failed:", error);
+      setSpeechError("Please allow microphone access to record your answer.");
     }
   };
 
@@ -345,7 +500,10 @@ function Onboarding() {
         <main className="entry-content narrow mode-page">
           <span className="step-label">Step 3 of 3</span>
           <h1>Tell us about yourself.</h1>
-          <p className="entry-intro">Choose what feels easiest. You can switch anytime.</p>
+          <p className="entry-intro">
+            Choose what feels easiest. You can switch anytime.
+          </p>
+
           <div className="mode-options">
             <button className="mode-option featured" onClick={() => setMode("voice")}>
               <span className="mode-icon"><Mic size={28} /></span>
@@ -356,6 +514,7 @@ function Onboarding() {
               </div>
               <ArrowRight size={20} />
             </button>
+
             <button className="mode-option" onClick={() => setMode("write")}>
               <span className="mode-icon write"><PenLine size={27} /></span>
               <div>
@@ -365,7 +524,10 @@ function Onboarding() {
               <ArrowRight size={20} />
             </button>
           </div>
-          <p className="privacy-note"><ShieldCheck size={16} /> Your answers are only used to find better work.</p>
+
+          <p className="privacy-note">
+            <ShieldCheck size={16} /> Your answers are only used to find better work.
+          </p>
         </main>
       </div>
     );
@@ -374,6 +536,7 @@ function Onboarding() {
   return (
     <div className="conversation-shell">
       <Header back="/onboarding" progress={66 + step * 11} />
+
       <main className="conversation">
         <div className="conversation-top">
           <span className="ai-orb"><Sparkles size={19} /></span>
@@ -381,30 +544,80 @@ function Onboarding() {
             <span className="speaking-label">KAAMSETU ASSISTANT</span>
             <h2>{mode === "voice" ? "Let’s have a quick chat" : "A few quick questions"}</h2>
           </div>
-          <button className="close-button" onClick={() => navigate("/")}><X size={19} /></button>
+          <button className="close-button" onClick={() => navigate("/")}>
+            <X size={19} />
+          </button>
         </div>
+
         <div className="question-progress">
           <span className="active" />
           <span className={step > 0 ? "active" : ""} />
           <span className={step > 1 ? "active" : ""} />
         </div>
+
         <section className="question-card">
-          <button className="listen-question" aria-label="Listen to question"><Volume2 size={18} /></button>
-          <p className="hindi-question">{questions[step][0]}</p>
-          <p className="translation">{questions[step][1]}</p>
+          <button
+            className="listen-question"
+            aria-label="Listen to question"
+            onClick={playQuestion}
+            disabled={mode === "voice" && (!translatedQuestion || isSpeaking)}
+          >
+            <Volume2 size={18} />
+          </button>
+
+          <p className="hindi-question">
+            {mode === "voice"
+              ? translatedQuestion || "Preparing your question..."
+              : questions[step][0]}
+          </p>
+
+          <p className="translation">
+            {mode === "voice"
+              ? questions[step][1]
+              : questions[step][1]}
+          </p>
         </section>
+
         {mode === "voice" ? (
           <section className="voice-answer">
             <div className={`sound-wave ${listening ? "is-listening" : ""}`}>
               {[1, 2, 3, 4, 5, 6, 7].map((i) => <i key={i} />)}
             </div>
-            <p>{listening ? "Listening…" : "Tap the microphone when you’re ready"}</p>
-            <button className={`mic-button ${listening ? "recording" : ""}`} onClick={() => setListening(!listening)}>
+
+            <p>
+              {listening
+                ? "Listening…"
+                : isSubmittingSpeech
+                  ? "Checking your answer…"
+                  : "Tap the microphone when you’re ready"}
+            </p>
+
+            <button
+              className={`mic-button ${listening ? "recording" : ""}`}
+              onClick={toggleRecording}
+              disabled={isSubmittingSpeech}
+            >
               <Mic size={28} />
             </button>
-            <small>{listening ? "Tap again when you’re done" : "You can speak in Hindi or English"}</small>
-            {listening && (
-              <button className="button primary response-next" onClick={next}>
+
+            <small>
+              {listening
+                ? "Tap again when you’re done"
+                : `You can speak in ${languages.find((l) => l.languageCode === preferredLanguageCode)?.english || "your selected language"}`}
+            </small>
+
+            {transcript && (
+              <p className="translation">We heard: “{transcript}”</p>
+            )}
+
+            {speechError && <p className="translation">{speechError}</p>}
+            {translationError && <p className="translation">{translationError}</p>}
+
+            {transcript && (
+              <button
+                className="button primary response-next"
+                onClick={() => next(transcript)}
+              >
                 Continue <ArrowRight size={17} />
               </button>
             )}
@@ -417,14 +630,27 @@ function Onboarding() {
               autoFocus
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
-              placeholder={step === 0 ? "e.g. Sunil Sharma" : step === 1 ? "e.g. Electrician" : "e.g. 5 years"}
+              placeholder={
+                step === 0
+                  ? "e.g. Sunil Sharma"
+                  : step === 1
+                    ? "e.g. Electrician"
+                    : "e.g. 5 years"
+              }
             />
-            <button className="button primary full" disabled={!answer.trim()} onClick={next}>
+            <button
+              className="button primary full"
+              disabled={!answer.trim()}
+              onClick={() => next()}
+            >
               Continue <ArrowRight size={17} />
             </button>
           </section>
         )}
-        <p className="conversation-helper"><MessageCircle size={15} /> Take your time. There are no wrong answers.</p>
+
+        <p className="conversation-helper">
+          <MessageCircle size={15} /> Take your time. There are no wrong answers.
+        </p>
       </main>
     </div>
   );
