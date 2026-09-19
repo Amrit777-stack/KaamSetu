@@ -11,11 +11,10 @@ async function hashPassword(password) {
 }
 
 async function passwordMatches(password, storedPassword) {
-  // Existing demo/database accounts use plaintext passwords or the seed placeholder.
-  // New registrations use scrypt; retain this compatibility while allowing those accounts to log in.
-  if (!storedPassword?.startsWith("scrypt$")) {
-    return password === storedPassword || (password === "password123" && storedPassword === "<bcrypt-hash-for-password123>");
-  }
+  // Existing demo/database accounts use plaintext passwords. New registrations
+  // use scrypt; retain this compatibility while allowing those accounts to log in.
+  if (storedPassword?.startsWith("<bcrypt-hash")) return password === "password123";
+  if (!storedPassword?.startsWith("scrypt$")) return password === storedPassword;
 
   const [, salt, expectedKey] = storedPassword.split("$");
   if (!salt || !expectedKey) return false;
@@ -70,9 +69,9 @@ let fallbackUsers = [
 
   // Employers
   {
-    id: 5,
+    id: 501,
     name: "Amit Shah",
-    email: "employer5@kaamsetu.demo",
+    email: "employer501@kaamsetu.demo",
     password: "password123",
     role: "employer",
     profile_id: 1,
@@ -80,9 +79,9 @@ let fallbackUsers = [
     location: "Pune",
   },
   {
-    id: 6,
+    id: 502,
     name: "Kavya Iyer",
-    email: "employer6@kaamsetu.demo",
+    email: "employer502@kaamsetu.demo",
     password: "password123",
     role: "employer",
     profile_id: 2,
@@ -90,9 +89,9 @@ let fallbackUsers = [
     location: "Pune",
   },
   {
-    id: 7,
+    id: 503,
     name: "Rahul Nair",
-    email: "employer7@kaamsetu.demo",
+    email: "employer503@kaamsetu.demo",
     password: "password123",
     role: "employer",
     profile_id: 3,
@@ -271,6 +270,15 @@ export async function authenticateUser({ email, password, userId, expectedRole }
       const err = new Error("No employer account found");
       err.status = 401;
       throw err;
+    }
+    // Legacy development fixtures stored a non-functional bcrypt placeholder.
+    // Upgrade it after successful authentication so subsequent logins use a
+    // real password hash without changing the account's credentials.
+    if (normalizedRole === "employer" && user.password_hash?.startsWith("<bcrypt-hash")) {
+      await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [
+        await hashPassword(password),
+        user.id,
+      ]);
     }
     return {
       id: Number(user.id),

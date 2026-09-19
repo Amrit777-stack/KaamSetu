@@ -1314,10 +1314,10 @@ function Auth({ initialMode = "login", initialRole }) {
                   <button
                     type="button"
                     className="quick-chip warning"
-                    onClick={() => fillCredentials("employer5@kaamsetu.demo", "worker", "5")}
+                    onClick={() => fillCredentials("employer501@kaamsetu.demo", "worker", "501")}
                     title="Employer details in worker login"
                   >
-                    <X size={13} /> Employer 5 &rarr; Fails
+                    <X size={13} /> Employer 501 &rarr; Fails
                   </button>
                 </div>
               ) : (
@@ -1325,7 +1325,7 @@ function Auth({ initialMode = "login", initialRole }) {
                   <button
                     type="button"
                     className="quick-chip"
-                    onClick={() => fillCredentials("employer5@kaamsetu.demo", "employer", "password123")}
+                    onClick={() => fillCredentials("employer501@kaamsetu.demo", "employer", "password123")}
                   >
                     <Check size={13} /> {t.quickChipEmployer}
                   </button>
