@@ -6,6 +6,9 @@ import { notFound } from "./middleware/notFound.js";
 import employerRouter from "./routes/employerRoutes.js";
 import jobRouter from "./routes/jobRoutes.js";
 import workerRouter from "./routes/workerRoutes.js";
+import ttsRouter from "./routes/tts.js";
+import translateRouter from "./routes/translate.js";
+import sttRouter from "./routes/stt.js";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -24,6 +27,9 @@ app.get("/api/health", (_request, response) => {
 app.use("/api/workers", workerRouter);
 app.use("/api/employers", employerRouter);
 app.use("/api/jobs", jobRouter);
+app.use("/api/tts", ttsRouter);
+app.use("/api/translate", translateRouter);
+app.use("/api/stt", sttRouter);
 app.use(notFound);
 
 app.listen(port, () => {
