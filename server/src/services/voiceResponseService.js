@@ -8,15 +8,45 @@ const dataDirectory = path.resolve(serviceDirectory, "../../data");
 const responsesPath = path.join(dataDirectory, "voice-responses.json");
 let writePromise = Promise.resolve();
 
-function extractValue(field, transcript) {
-  if (field !== "experienceYears") return transcript.trim();
+function cleanExtractedText(value) {
+  return value
+    .replace(/^[\s,.:;\-]+|[\s,.:;!?]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  const numericMatch = transcript.match(/\b(\d+(?:\.\d+)?)\b/);
-  if (numericMatch) return Number(numericMatch[1]);
+export function extractValue(field, transcript) {
+  const text = cleanExtractedText(transcript || "");
+  if (!text) return null;
 
-  const wordNumbers = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-  const wordMatch = transcript.toLowerCase().match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
-  return wordMatch ? wordNumbers[wordMatch[1]] : transcript.trim();
+  if (field === "experienceYears") {
+    const numericMatch = text.match(/\b(\d+(?:\.\d+)?)\b/);
+    if (numericMatch) return Number(numericMatch[1]);
+
+    const wordNumbers = {
+      zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
+      six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+      eleven: 11, twelve: 12, fifteen: 15, twenty: 20,
+    };
+    const wordMatch = text.toLowerCase().match(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\b/);
+    return wordMatch ? wordNumbers[wordMatch[1]] : null;
+  }
+
+  const patterns = field === "name"
+    ? [
+        /(?:my\s+)?name\s+is\s+(.+)/i,
+        /(?:i\s+am|i'm|this\s+is)\s+(.+)/i,
+      ]
+    : [
+        /(?:i\s+)?(?:work|working)\s+as\s+(?:an?\s+)?(.+)/i,
+        /(?:my\s+)?(?:occupation|profession|job)\s+(?:is\s+)?(?:an?\s+)?(.+)/i,
+        /(?:i\s+am|i'm)\s+(?:an?\s+)?(.+)/i,
+      ];
+  const match = patterns.map((pattern) => text.match(pattern)).find(Boolean);
+  const extracted = match ? match[1] : text;
+
+  // Discard sentence tails that describe experience rather than the requested field.
+  return cleanExtractedText(extracted.replace(/\s*(?:,|and\s+)?\s*(?:with|for|having)\s+\d+.*$/i, "")) || null;
 }
 
 async function readResponses() {
@@ -29,15 +59,21 @@ async function readResponses() {
   }
 }
 
-export async function saveVoiceResponse({ field, transcript, englishTranscript, languageCode, languageProbability }) {
+export async function saveVoiceResponse({
+  field,
+  transcript,
+  englishTranscript,
+  userId,
+  languageCode,
+  languageProbability,
+}) {
+  const normalizedUserId = Number(userId);
+  const value = extractValue(field, englishTranscript);
   const record = {
     id: randomUUID(),
+    userId: Number.isSafeInteger(normalizedUserId) && normalizedUserId > 0 ? normalizedUserId : null,
     field,
-    // Use English for structured extraction (for example, "three years" -> 3).
-    value: extractValue(field, englishTranscript),
-    // Keep the recognised text exactly in the language/script returned by STT.
-    transcript: transcript.trim(),
-    englishTranscript: englishTranscript.trim(),
+    value,
     detectedLanguageCode: languageCode || null,
     languageProbability: languageProbability ?? null,
     createdAt: new Date().toISOString(),
@@ -51,5 +87,11 @@ export async function saveVoiceResponse({ field, transcript, englishTranscript, 
     await rename(temporaryPath, responsesPath);
   });
   await writePromise;
-  return record;
+  // The transcript is returned for immediate UI feedback only. It is deliberately
+  // not written to disk: voice-responses.json contains extracted profile values.
+  return {
+    ...record,
+    transcript: transcript.trim(),
+    englishTranscript: englishTranscript.trim(),
+  };
 }

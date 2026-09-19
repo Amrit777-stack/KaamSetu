@@ -34,7 +34,8 @@ import {
   speakText,
   getFallbackQuestion,
 } from "./services/questionSpeech.js";
-import { submitVoiceResponse } from "./services/voiceResponse.js";
+import { submitVoiceResponse, transcribeTemporaryJobSearch } from "./services/voiceResponse.js";
+import { useTranslatedJobTitle } from "./services/jobTitleTranslation.js";
 import { dashboardTranslations, occupationTranslations } from "./services/dashboardTranslations.js";
 import "./App.css";
 import "./LanguageSelect.css";
@@ -53,6 +54,11 @@ const questions = [
   ["आप किस तरह का काम करते हैं?", "What kind of work do you do?"],
   ["आपको इस काम का कितना अनुभव है?", "How much experience do you have?"],
 ];
+
+function LocalizedJobTitle({ title, languageCode }) {
+  const translatedTitle = useTranslatedJobTitle(title, languageCode);
+  return <>{translatedTitle}</>;
+}
 
 // Clean up any stale legacy user in localStorage on module load
 try {
@@ -461,6 +467,8 @@ function Onboarding() {
   const [listening, setListening] = useState(false);
   const [answer, setAnswer] = useState("");
   const [answers, setAnswers] = useState(["", "", ""]);
+  const [englishAnswers, setEnglishAnswers] = useState(["", "", ""]);
+  const [parsedAnswers, setParsedAnswers] = useState(["", "", ""]);
   const [translatedQuestion, setTranslatedQuestion] = useState("");
   const [translationError, setTranslationError] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -490,6 +498,11 @@ function Onboarding() {
       (step === 0 ? "Worker" : step === 1 ? "Technician" : "3 years");
     setAnswers(newAnswers);
 
+    const newEnglishAnswers = [...englishAnswers];
+    newEnglishAnswers[step] =
+      newEnglishAnswers[step].trim() || newAnswers[step];
+    setEnglishAnswers(newEnglishAnswers);
+
     if (step < 2) {
       setStep(step + 1);
       setAnswer("");
@@ -501,8 +514,9 @@ function Onboarding() {
     } else {
       const user = getStoredUser();
       const workerName = newAnswers[0];
-      const workerOccupation = newAnswers[1];
-      const experienceYears = parseFloat(newAnswers[2]) || 2;
+      // English translation is used for profile fields that drive matching.
+      const workerOccupation = newEnglishAnswers[1];
+      const experienceYears = Number(parsedAnswers[2]) || parseFloat(newEnglishAnswers[2]) || 2;
 
       if (user && user.id && user.role === "worker") {
         try {
@@ -615,18 +629,28 @@ function Onboarding() {
 
           const record = await submitVoiceResponse(
             audio,
-            ["name", "occupation", "experienceYears"][step]
+            ["name", "occupation", "experienceYears"][step],
+            getStoredUser()?.id,
           );
 
           const recognized = record.transcript || record.englishTranscript || "";
+          const extractedValue = String(record.value ?? record.englishTranscript ?? recognized);
           setTranscript(recognized);
-          setAnswer(recognized);
+          setAnswer(extractedValue);
 
           // Store the recognized response immediately so the next step
           // keeps the worker's answer even before the Continue button.
           const newAnswers = [...answers];
-          newAnswers[step] = recognized;
+          newAnswers[step] = extractedValue;
           setAnswers(newAnswers);
+
+          const newEnglishAnswers = [...englishAnswers];
+          newEnglishAnswers[step] = extractedValue;
+          setEnglishAnswers(newEnglishAnswers);
+
+          const newParsedAnswers = [...parsedAnswers];
+          newParsedAnswers[step] = record.value;
+          setParsedAnswers(newParsedAnswers);
         } catch (error) {
           console.error("Speech recognition failed:", error);
           setSpeechError(error.message || "Speech recognition failed.");
@@ -763,7 +787,7 @@ function Onboarding() {
             {transcript && (
               <button
                 className="button primary response-next"
-                onClick={() => next(transcript)}
+                onClick={() => next()}
               >
                 Continue <ArrowRight size={17} />
               </button>
@@ -968,6 +992,8 @@ function Auth({ initialMode = "login", initialRole }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [registeredUser, setRegisteredUser] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -975,22 +1001,20 @@ function Auth({ initialMode = "login", initialRole }) {
     if (e) e.preventDefault();
     setError(null);
 
-    if (mode === "signup" && password !== confirmPassword) {
+    if (mode === "signup" && role === "employer" && password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
+    if (mode === "signup" && role === "worker" && !occupation.trim()) {
+      setError("Please enter your basic occupation");
+      return;
+    }
+
     if (mode === "login") {
-      if (role === "worker") {
-        if (!email.trim() || !userId.toString().trim()) {
-          setError(t.errorMissingFieldsWorker || "Please enter both Email and User ID");
-          return;
-        }
-      } else {
-        if (!email.trim() || !password.trim()) {
-          setError(t.errorMissingFieldsEmployer || "Please enter both Email and Password");
-          return;
-        }
+      if (!email.trim() || (role === "worker" && !userId.toString().trim()) || (role === "employer" && !password.trim())) {
+        setError(role === "worker" ? "Please enter both Email and User ID" : "Please enter both Email and Password");
+        return;
       }
     }
 
@@ -998,18 +1022,9 @@ function Auth({ initialMode = "login", initialRole }) {
 
     try {
       if (mode === "login") {
-        const body =
-          role === "worker"
-            ? {
-                email: email.trim(),
-                userId: Number(userId.toString().trim()),
-                expectedRole: "worker",
-              }
-            : {
-                email: email.trim(),
-                password,
-                expectedRole: "employer",
-              };
+        const body = role === "worker"
+          ? { email: email.trim(), userId: Number(userId.toString().trim()), expectedRole: role }
+          : { email: email.trim(), password, expectedRole: role };
 
         const res = await apiRequest("/auth/login", {
           method: "POST",
@@ -1029,15 +1044,16 @@ function Auth({ initialMode = "login", initialRole }) {
           body: JSON.stringify({
             name: name.trim(),
             email: email.trim(),
-            password,
+            password: role === "employer" ? password : undefined,
             role,
+            occupation: role === "worker" ? occupation.trim() : undefined,
             companyName: role === "employer" ? (companyName.trim() || `${name.trim()}'s Company`) : null,
           }),
         });
 
         setStoredUser(res.user);
         if (res.user.role === "worker") {
-          navigate("/worker/dashboard");
+          setRegisteredUser(res.user);
         } else {
           navigate("/employer");
         }
@@ -1068,6 +1084,32 @@ function Auth({ initialMode = "login", initialRole }) {
     setError(null);
     if (fillRole) setRole(fillRole);
   };
+
+  if (registeredUser) {
+    return (
+      <div className="site-shell">
+        <Header back="/" />
+        <main className="auth-shell">
+          <section className="auth-card" style={{ textAlign: "center" }}>
+            <CheckCircle2 size={44} style={{ color: "var(--green)", marginBottom: "12px" }} />
+            <h2>Account created</h2>
+            <p>Save these login credentials. You will use them to sign in next time.</p>
+            <div style={{ margin: "22px 0", padding: "18px", borderRadius: "8px", background: "#f0f5ea" }}>
+              <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "6px" }}>Your User ID</div>
+              <strong style={{ fontSize: "28px", color: "var(--green)" }}>{registeredUser.id}</strong>
+              <div style={{ marginTop: "10px", fontSize: "14px" }}>{registeredUser.email}</div>
+            </div>
+            <button
+              className="button primary full"
+              onClick={() => navigate(registeredUser.role === "worker" ? "/worker/dashboard" : "/employer")}
+            >
+              Continue <ArrowRight size={17} />
+            </button>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="site-shell">
@@ -1158,7 +1200,7 @@ function Auth({ initialMode = "login", initialRole }) {
                 id="email"
                 type="email"
                 required
-                placeholder={t.emailPlaceholder || (role === "worker" ? "worker1@kaamsetu.demo" : "employer501@kaamsetu.demo")}
+                placeholder={t.emailPlaceholder || "name@example.com"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -1176,7 +1218,7 @@ function Auth({ initialMode = "login", initialRole }) {
                   onChange={(e) => setUserId(e.target.value)}
                 />
               </div>
-            ) : (
+            ) : mode === "login" ? (
               <div className="form-group">
                 <label htmlFor="password">{t.passwordLabel || "Password"}</label>
                 <input
@@ -1188,23 +1230,37 @@ function Auth({ initialMode = "login", initialRole }) {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
+            ) : null}
+
+            {mode === "signup" && role === "employer" && (
+              <div className="form-group">
+                <label htmlFor="password">{t.passwordLabel || "Password"}</label>
+                <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
             )}
 
-            {mode === "signup" && (
+            {mode === "signup" && role === "employer" && (
               <div className="form-group">
                 <label htmlFor="confirmPassword">Confirm Password</label>
+                <input id="confirmPassword" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              </div>
+            )}
+
+            {mode === "signup" && role === "worker" && (
+              <div className="form-group">
+                <label htmlFor="occupation">Basic Occupation</label>
                 <input
-                  id="confirmPassword"
-                  type="password"
+                  id="occupation"
+                  type="text"
                   required
-                  placeholder="Re-enter your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="e.g. Electrician"
+                  value={occupation}
+                  onChange={(e) => setOccupation(e.target.value)}
                 />
               </div>
             )}
 
-            {/* Additional Fields for Sign Up: Only Company for Employers */}
+            {/* Additional fields for employer sign-up */}
             {mode === "signup" && role === "employer" && (
               <div className="form-group">
                 <label htmlFor="company">Company / Business Name</label>
@@ -1223,9 +1279,7 @@ function Auth({ initialMode = "login", initialRole }) {
               {loading
                 ? t.processingBtn
                 : mode === "login"
-                  ? role === "worker"
-                    ? t.loginBtn
-                    : "Sign in as Employer"
+                  ? t.loginBtn
                   : `Create ${role === "worker" ? "Worker" : "Employer"} Account`} <ArrowRight size={17} />
             </button>
           </form>
@@ -1246,10 +1300,10 @@ function Auth({ initialMode = "login", initialRole }) {
                   <button
                     type="button"
                     className="quick-chip warning"
-                    onClick={() => fillCredentials("employer501@kaamsetu.demo", "worker", "501")}
+                    onClick={() => fillCredentials("employer5@kaamsetu.demo", "worker", "5")}
                     title="Employer details in worker login"
                   >
-                    <X size={13} /> Employer 501 &rarr; Fails
+                    <X size={13} /> Employer 5 &rarr; Fails
                   </button>
                 </div>
               ) : (
@@ -1257,7 +1311,7 @@ function Auth({ initialMode = "login", initialRole }) {
                   <button
                     type="button"
                     className="quick-chip"
-                    onClick={() => fillCredentials("employer501@kaamsetu.demo", "employer", "password123")}
+                    onClick={() => fillCredentials("employer5@kaamsetu.demo", "employer", "password123")}
                   >
                     <Check size={13} /> {t.quickChipEmployer}
                   </button>
@@ -1310,10 +1364,14 @@ function WorkerDashboard() {
   const [voiceAnswer, setVoiceAnswer] = useState("");
   const [voiceAnswers, setVoiceAnswers] = useState(["", "", ""]);
   const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceSearchNormalizedAnswer, setVoiceSearchNormalizedAnswer] = useState("");
   const [voiceSubmitting, setVoiceSubmitting] = useState(false);
   const [voiceRecorder, setVoiceRecorder] = useState(null);
   const [isSpeakingVoice, setIsSpeakingVoice] = useState(false);
   const [translatedVoiceQuestion, setTranslatedVoiceQuestion] = useState("");
+  // Exists only while the voice-search modal is open; never persisted.
+  const [voiceSearch, setVoiceSearch] = useState(null);
+  const [voiceQuestion, setVoiceQuestion] = useState("");
 
   const fetchWorkerProfileDetails = async (userId) => {
     const id = userId || currentUser?.id;
@@ -1386,25 +1444,7 @@ function WorkerDashboard() {
     return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
   }, []);
 
-  // Translate voice question when voice assistant is active
-  useEffect(() => {
-    if (!voiceApplyJob) return undefined;
-    let ignore = false;
-    const englishText = questions[voiceStep][1];
-    translateQuestion(englishText, currentLang)
-      .then((trans) => {
-        if (!ignore && trans) setTranslatedVoiceQuestion(trans);
-      })
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
-  }, [voiceApplyJob, voiceStep, currentLang]);
-
-  const currentVoiceQuestionDisplay =
-    translatedVoiceQuestion ||
-    getFallbackQuestion(questions[voiceStep][1], currentLang) ||
-    questions[voiceStep][0];
+  const currentVoiceQuestionDisplay = voiceQuestion;
 
   const playVoiceQuestion = async (text) => {
     if (!text || isSpeakingVoice) return;
@@ -1418,13 +1458,22 @@ function WorkerDashboard() {
     }
   };
 
-  const handleStartVoiceApply = (job = null) => {
+  const handleStartVoiceApply = async (job = null) => {
     setVoiceApplyJob(job || { title: "Skilled Opportunity", company_name: "KaamSetu Partner" });
     setVoiceStep(0);
-    setVoiceAnswer(currentUser.name || "");
-    setVoiceAnswers([currentUser.name || "", currentUser.occupation || "", "2"]);
+    setVoiceAnswer("");
+    setVoiceAnswers([]);
     setVoiceTranscript("");
+    setVoiceSearchNormalizedAnswer("");
     setVoiceListening(false);
+    try {
+      const result = await apiRequest("/voice-job-search/start", { method: "POST", body: JSON.stringify({ language: currentLang }) });
+      setVoiceSearch(result.search);
+      setVoiceQuestion(result.nextQuestion);
+    } catch (err) {
+      setBanner({ type: "error", title: "Voice Search Notice", message: err.message || "Unable to start voice job search" });
+      setVoiceApplyJob(null);
+    }
   };
 
   const handleCloseVoiceApply = () => {
@@ -1438,6 +1487,8 @@ function WorkerDashboard() {
     setVoiceListening(false);
     setVoiceRecorder(null);
     setVoiceApplyJob(null);
+    setVoiceSearch(null);
+    setVoiceQuestion("");
   };
 
   const toggleVoiceRecording = async () => {
@@ -1460,13 +1511,14 @@ function WorkerDashboard() {
         setVoiceSubmitting(true);
         try {
           const audio = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
-          const record = await submitVoiceResponse(
-            audio,
-            ["name", "occupation", "experienceYears"][voiceStep]
-          );
-          const recognized = record.englishTranscript || record.transcript || "";
+          const record = await transcribeTemporaryJobSearch(audio, currentLang);
+          const recognized = record.transcript || record.englishTranscript || "";
+          const extractedValue = String(record.englishTranscript ?? recognized);
           setVoiceTranscript(recognized);
+          // Keep the worker-facing answer in the language they spoke. The
+          // translated transcript is only used for temporary search parsing.
           setVoiceAnswer(recognized);
+          setVoiceSearchNormalizedAnswer(extractedValue);
           setVoiceAnswers((prev) => {
             const next = [...prev];
             next[voiceStep] = recognized;
@@ -1486,7 +1538,7 @@ function WorkerDashboard() {
     }
   };
 
-  const handleNextVoiceStep = async (overrideAnswer = "") => {
+  const handleLegacyVoiceApplication = async (overrideAnswer = "") => {
     const finalAnswer =
       overrideAnswer ||
       voiceAnswer.trim() ||
@@ -1522,10 +1574,20 @@ function WorkerDashboard() {
               language: currentLang,
             }),
           });
-          setCurrentUser((prev) => ({
+          const updatedUser = {
+            ...currentUser,
+            name: workerName,
+            occupation: workerOccupation,
+          };
+          setCurrentUser(updatedUser);
+          // Keep the shared session user in sync so the top-right header badge
+          // reflects the newly entered name immediately and after navigation.
+          setStoredUser(updatedUser);
+          setWorkerProfileDetails((prev) => prev && ({
             ...prev,
             name: workerName,
             occupation: workerOccupation,
+            experienceYears: workerExp,
           }));
         }
 
@@ -1566,6 +1628,42 @@ function WorkerDashboard() {
       }
     }
   };
+
+  const handleNextVoiceStep = async (overrideAnswer = "") => {
+    const finalAnswer = overrideAnswer || voiceAnswer.trim() || voiceAnswers[voiceStep];
+    if (!finalAnswer || !voiceSearch) return;
+    const updatedAnswers = [...voiceAnswers];
+    updatedAnswers[voiceStep] = finalAnswer;
+    setVoiceAnswers(updatedAnswers);
+    setActionLoading("submitting-voice");
+    try {
+      const result = await apiRequest("/voice-job-search/turn", {
+        method: "POST",
+        body: JSON.stringify({ answer: voiceSearchNormalizedAnswer || finalAnswer, search: voiceSearch, language: currentLang }),
+      });
+      if (result.isComplete) {
+        setAvailableJobs((result.matches || []).map((match) => ({ ...match.job, voiceMatch: match })));
+        setBanner({ type: "success", title: "Jobs found", message: `${result.matches?.length || 0} matching jobs found for your voice search.` });
+        handleCloseVoiceApply();
+      } else {
+        setVoiceSearch(result.search);
+        setVoiceQuestion(result.nextQuestion);
+        setVoiceStep((step) => step + 1);
+        setVoiceAnswer("");
+        setVoiceSearchNormalizedAnswer("");
+        setVoiceTranscript("");
+        setVoiceListening(false);
+      }
+    } catch (err) {
+      setBanner({ type: "error", title: "Voice Search Notice", message: err.message || "Failed to find jobs" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  useEffect(() => {
+    if (voiceApplyJob && voiceQuestion) playVoiceQuestion(voiceQuestion);
+  }, [voiceApplyJob, voiceQuestion]);
 
   const handleApply = async (job) => {
     if (!currentUser?.id) return;
@@ -1651,6 +1749,9 @@ function WorkerDashboard() {
               : "Pune";
 
   const appliedJobIds = new Set(workerApplications.map((a) => Number(a.job_id)));
+  // Re-use the active localized question so manual entry is always in the
+  // selected language rather than showing a stale English field hint.
+  const voiceSearchPlaceholder = currentVoiceQuestionDisplay || "Enter your answer";
 
   // Deduplicate and filter available open opportunities (one opportunity once)
   const displayedAvailableJobs = useMemo(() => {
@@ -1772,7 +1873,7 @@ function WorkerDashboard() {
                   {t.applyNewJobTab || "Apply for New Job"}
                 </h3>
                 <p style={{ margin: 0, color: "var(--muted)", fontSize: "14px" }}>
-                  Browse open vacancies below to apply directly, or speak naturally with our Voice Assistant.
+                  {t.browseOpportunities || "Browse open vacancies below to apply directly, or speak naturally with our Voice Assistant."}
                 </p>
               </div>
               <button
@@ -1780,7 +1881,7 @@ function WorkerDashboard() {
                 className="button primary"
                 onClick={() => handleStartVoiceApply(null)}
               >
-                <Mic size={16} /> Apply for New Job with Speech
+                <Mic size={16} /> {t.voiceSearchBtn || "Find Jobs by Voice"}
               </button>
             </div>
 
@@ -1817,10 +1918,10 @@ function WorkerDashboard() {
                       </div>
                       <div>
                         <span className="step-label">
-                          VOICE APPLICATION · STEP {voiceStep + 1} OF 3
+                          {t.voiceJobSearch || "Voice Job Search"} · {voiceStep + 1}
                         </span>
                         <h3 style={{ margin: "2px 0 0", fontSize: "17px" }}>
-                          {voiceApplyJob.title ? `Applying for: ${voiceApplyJob.title}` : "Voice Job Application"}
+                          {t.voiceJobSearch || "Voice Job Search"}
                         </h3>
                       </div>
                     </div>
@@ -1828,7 +1929,7 @@ function WorkerDashboard() {
                       type="button"
                       onClick={handleCloseVoiceApply}
                       style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--muted)", padding: "4px" }}
-                      title="Cancel and close"
+                      title={t.cancelClose || "Cancel and close"}
                     >
                       <X size={22} />
                     </button>
@@ -1841,7 +1942,7 @@ function WorkerDashboard() {
                       className="listen-question"
                       onClick={() => playVoiceQuestion(currentVoiceQuestionDisplay)}
                       disabled={isSpeakingVoice}
-                      title="Listen to question aloud / सुनें"
+                      title={t.listenQuestion || "Listen to question aloud"}
                     >
                       <Volume2 size={20} />
                     </button>
@@ -1849,7 +1950,7 @@ function WorkerDashboard() {
                       {currentVoiceQuestionDisplay}
                     </p>
                     <p className="translation" style={{ margin: "6px 0 0", fontSize: "13px" }}>
-                      {questions[voiceStep][1]}
+                      {currentVoiceQuestionDisplay}
                     </p>
                   </div>
 
@@ -1870,14 +1971,14 @@ function WorkerDashboard() {
 
                     <small style={{ display: "block", marginTop: "12px", color: "var(--muted)", fontSize: "12px" }}>
                       {voiceListening
-                        ? "Listening... Tap to stop speaking"
+                        ? (t.listeningVoice || "Listening... Tap to stop speaking")
                         : voiceSubmitting
-                        ? "Processing your voice with Sarvam AI..."
-                        : "Tap mic and speak your answer naturally"}
+                        ? (t.processingVoice || "Processing your voice...")
+                        : (t.tapToSpeak || "Tap mic and speak your answer naturally")}
                     </small>
                     {voiceTranscript && (
                       <div style={{ marginTop: "10px", background: "#f0f5ea", padding: "8px 14px", borderRadius: "8px", fontSize: "13px", color: "var(--green)" }}>
-                        🎙️ <strong>Heard:</strong> "{voiceTranscript}"
+                        🎙️ <strong>{t.heard || "Heard:"}</strong> "{voiceTranscript}"
                       </div>
                     )}
                   </div>
@@ -1885,20 +1986,17 @@ function WorkerDashboard() {
                   {/* Manual entry option */}
                   <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: "1px dashed var(--line)" }}>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "var(--muted)", marginBottom: "6px" }}>
-                      Or fill details manually:
+                      {t.fillManually || "Or fill details manually:"}
                     </label>
                     <div style={{ display: "flex", gap: "10px" }}>
                       <input
                         type="text"
                         value={voiceAnswer}
-                        onChange={(e) => setVoiceAnswer(e.target.value)}
-                        placeholder={
-                          voiceStep === 0
-                            ? "Your Full Name"
-                            : voiceStep === 1
-                            ? "Trade / Occupation (e.g. Welder, Electrician)"
-                            : "Years of experience (e.g. 3)"
-                        }
+                        onChange={(e) => {
+                          setVoiceAnswer(e.target.value);
+                          setVoiceSearchNormalizedAnswer("");
+                        }}
+                        placeholder={voiceSearchPlaceholder}
                         style={{
                           flex: 1,
                           padding: "10px 14px",
@@ -1913,7 +2011,7 @@ function WorkerDashboard() {
                         onClick={() => handleNextVoiceStep()}
                         disabled={actionLoading === "submitting-voice"}
                       >
-                        {voiceStep < 2 ? "Next" : actionLoading === "submitting-voice" ? "Submitting..." : "Submit Application"}
+                        {actionLoading === "submitting-voice" ? (t.searching || "Searching...") : (t.next || "Next")}
                         <ArrowRight size={14} />
                       </button>
                     </div>
@@ -1926,10 +2024,10 @@ function WorkerDashboard() {
             <div>
               <h3 style={{ fontSize: "18px", margin: "0 0 16px", display: "flex", alignItems: "center", gap: "8px" }}>
                 <BriefcaseBusiness size={20} style={{ color: "var(--green)" }} />
-                Open Opportunities ({displayedAvailableJobs.length})
+                {t.openOpportunities || "Open Opportunities"} ({displayedAvailableJobs.length})
               </h3>
               {displayedAvailableJobs.length === 0 ? (
-                <div className="empty-state">No open jobs available currently. Check back soon!</div>
+                <div className="empty-state">{t.noOpenJobs || "No open jobs available currently. Check back soon!"}</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {displayedAvailableJobs.map((job) => {
@@ -1938,7 +2036,7 @@ function WorkerDashboard() {
                       <div key={job.id} className="job-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                            <h3 style={{ margin: 0 }}>{job.title}</h3>
+                            <h3 style={{ margin: 0 }}><LocalizedJobTitle title={job.title} languageCode={currentLang} /></h3>
                             <span className="badge badge-applied" style={{ fontSize: "12px" }}>
                               {job.company_name}
                             </span>
@@ -1949,16 +2047,16 @@ function WorkerDashboard() {
                           <div className="job-tags">
                             <span className="tag">📍 {job.location || "Pune"}</span>
                             <span className="tag">💰 ₹{job.salary_min?.toLocaleString()} - ₹{job.salary_max?.toLocaleString()}/mo</span>
-                            <span className="tag">👥 {job.openings} Openings</span>
+                            <span className="tag">👥 {job.openings} {t.openings || "Openings"}</span>
                             <span className="tag">
-                              🛠️ {Math.round(Number(job.experience_required != null ? job.experience_required : (job.required_experience != null ? job.required_experience : 0)))} yrs min exp
+                              🛠️ {Math.round(Number(job.experience_required != null ? job.experience_required : (job.required_experience != null ? job.required_experience : 0)))} {t.minimumExperience || "yrs minimum experience"}
                             </span>
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                           {alreadyApplied ? (
                             <span className="badge badge-applied" style={{ padding: "8px 14px", fontSize: "13px" }}>
-                              <Check size={14} /> Applied
+                              <Check size={14} /> {t.applied || "Applied"}
                             </span>
                           ) : (
                             <>
@@ -1967,7 +2065,7 @@ function WorkerDashboard() {
                                 className="button primary small"
                                 onClick={() => handleStartVoiceApply(job)}
                                 style={{ padding: "8px 14px", fontSize: "13px" }}
-                                title="Apply for this job using speech assistant"
+                                title={t.voiceSearchBtn || "Find Jobs by Voice"}
                               >
                                 <Mic size={14} /> {t.voiceApplyBtn || "Voice Apply"}
                               </button>
@@ -1978,7 +2076,7 @@ function WorkerDashboard() {
                                 onClick={() => handleApply(job)}
                                 style={{ padding: "8px 14px", fontSize: "13px" }}
                               >
-                                {actionLoading === job.id ? "Applying..." : (t.quickApplyBtn || "Quick Apply")} <ArrowRight size={14} />
+                                {actionLoading === job.id ? (t.applying || "Applying...") : (t.quickApplyBtn || "Quick Apply")} <ArrowRight size={14} />
                               </button>
                             </>
                           )}
@@ -2124,7 +2222,7 @@ function WorkerDashboard() {
                             <BriefcaseBusiness size={20} />
                           </div>
                           <div className="app-info">
-                            <h3>{app.job_title}</h3>
+                            <h3><LocalizedJobTitle title={app.job_title} languageCode={currentLang} /></h3>
                             <div className="app-meta">
                               <span>
                                 <Building2 size={14} /> <strong>{app.company_name}</strong>
@@ -2403,6 +2501,9 @@ function WorkerDashboard() {
 function Employer() {
   const navigate = useNavigate();
   const [currentUser] = useState(getStoredUser);
+  const [currentLang, setCurrentLang] = useState(
+    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
+  );
   const [activeTab, setActiveTab] = useState("jobs"); // "jobs" | "candidates"
   const [candidateSubTab, setCandidateSubTab] = useState("list"); // "list" | "details"
   const [selectedWorkerId, setSelectedWorkerId] = useState(null);
@@ -2416,6 +2517,14 @@ function Employer() {
   const [showPostJob, setShowPostJob] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [banner, setBanner] = useState(null);
+
+  useEffect(() => {
+    const handleLangChange = (event) => {
+      setCurrentLang(event.detail || localStorage.getItem("kaamsetu_language") || "hi-IN");
+    };
+    window.addEventListener("kaamsetu_language_changed", handleLangChange);
+    return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
+  }, []);
   const [editingJobId, setEditingJobId] = useState(null);
   const [editingOpenings, setEditingOpenings] = useState("");
 
@@ -2609,7 +2718,7 @@ function Employer() {
         method: "POST",
         body: JSON.stringify({
           employerId: currentUser.id || 501,
-          companyName: currentUser.name || "Employer Company",
+          companyName: currentUser.companyName || currentUser.name || "Employer Company",
           title: jobTitle,
           description: jobDesc,
           location: currentUser.location || "Pune",

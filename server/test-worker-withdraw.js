@@ -11,8 +11,7 @@ async function runWorkerWithdrawTests() {
   const rand = Date.now();
   const worker = await registerUser({
     name: `Worker Test ${rand}`,
-    email: `worker_${rand}@kaamsetu.test`,
-    password: "Password123!",
+    email: `worker${rand}@kaamsetu.demo`,
     role: "worker",
     occupation: "Welder",
     experienceYears: 4,
@@ -21,8 +20,7 @@ async function runWorkerWithdrawTests() {
 
   const employer = await registerUser({
     name: `Employer Test ${rand}`,
-    email: `emp_${rand}@kaamsetu.test`,
-    password: "Password123!",
+    email: `employer${rand}@kaamsetu.demo`,
     role: "employer",
     companyName: `Test Corp ${rand}`,
     phone: "9876543211",

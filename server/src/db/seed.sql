@@ -1,11 +1,11 @@
 INSERT INTO users (id, name, email, password_hash, role) VALUES
-  (1, 'Raju Kumar', 'raju@example.test', '$2b$10$demo.hash.not.for.production', 'worker'),
-  (2, 'Meena Devi', 'meena@example.test', '$2b$10$demo.hash.not.for.production', 'worker'),
-  (3, 'Suresh Patil', 'suresh@example.test', '$2b$10$demo.hash.not.for.production', 'worker'),
-  (4, 'Anitha Raj', 'anitha@example.test', '$2b$10$demo.hash.not.for.production', 'worker'),
-  (5, 'Amit Shah', 'amit@pragati.example.test', '$2b$10$demo.hash.not.for.production', 'employer'),
-  (6, 'Kavya Iyer', 'kavya@metro.example.test', '$2b$10$demo.hash.not.for.production', 'employer'),
-  (7, 'Rahul Nair', 'rahul@precision.example.test', '$2b$10$demo.hash.not.for.production', 'employer');
+  (1, 'Raju Kumar', 'worker1@kaamsetu.demo', 'user-id-only', 'worker'),
+  (2, 'Meena Devi', 'worker2@kaamsetu.demo', 'user-id-only', 'worker'),
+  (3, 'Suresh Patil', 'worker3@kaamsetu.demo', 'user-id-only', 'worker'),
+  (4, 'Anitha Raj', 'worker4@kaamsetu.demo', 'user-id-only', 'worker'),
+  (5, 'Amit Shah', 'employer5@kaamsetu.demo', 'password123', 'employer'),
+  (6, 'Kavya Iyer', 'employer6@kaamsetu.demo', 'password123', 'employer'),
+  (7, 'Rahul Nair', 'employer7@kaamsetu.demo', 'password123', 'employer');
 
 INSERT INTO worker_profiles (id, user_id, occupation, experience_years, expected_salary_min, location, preferred_shift, language, is_available) VALUES
   (1, 1, 'Welder', 4, 20000, 'Pune', 'day', 'hi-IN', TRUE),

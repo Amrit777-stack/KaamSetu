@@ -37,9 +37,10 @@ function getAudioFileMetadata(contentTypeHeader) {
 
 router.post("/", express.raw({ type: "audio/*", limit: "10mb" }), async (req, res) => {
   try {
-    const { field } = req.query;
+    const { field, userId, mode, language } = req.query;
 
-    if (!acceptedFields.has(field)) {
+    const isTemporaryJobSearch = mode === "job-search";
+    if (!isTemporaryJobSearch && !acceptedFields.has(field)) {
       return res.status(400).json({ error: "A valid field is required" });
     }
 
@@ -54,6 +55,7 @@ router.post("/", express.raw({ type: "audio/*", limit: "10mb" }), async (req, re
       });
     }
 
+    const requestedLanguage = /^[a-z]{2}-IN$/i.test(String(language || "")) ? language : "unknown";
     const { contentType, extension } = getAudioFileMetadata(req.get("content-type"));
     const audioFile = {
       data: req.body,
@@ -66,14 +68,14 @@ router.post("/", express.raw({ type: "audio/*", limit: "10mb" }), async (req, re
         // Keeps the recognised text in the language and script that was spoken.
         model: "saaras:v3",
         mode: "transcribe",
-        language_code: "unknown",
+        language_code: requestedLanguage,
       }),
       client.speechToText.transcribe({
         file: audioFile,
         // The English text is retained for extracting structured values in storage.
         model: "saaras:v3",
         mode: "translate",
-        language_code: "unknown",
+        language_code: requestedLanguage,
       }),
     ]);
 
@@ -81,10 +83,23 @@ router.post("/", express.raw({ type: "audio/*", limit: "10mb" }), async (req, re
       throw new Error("Sarvam returned an incomplete transcript");
     }
 
+    // Job-search audio is transcribed for the current request only. It must not
+    // be written to the voice-response file or any permanent worker data.
+    if (isTemporaryJobSearch) {
+      return res.status(200).json({
+        record: {
+          transcript: nativeResponse.transcript.trim(),
+          englishTranscript: englishResponse.transcript.trim(),
+          detectedLanguageCode: nativeResponse.language_code || null,
+        },
+      });
+    }
+
     const record = await saveVoiceResponse({
       field,
       transcript: nativeResponse.transcript,
       englishTranscript: englishResponse.transcript,
+      userId,
       languageCode: nativeResponse.language_code,
       languageProbability: nativeResponse.language_probability,
     });
