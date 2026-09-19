@@ -218,7 +218,12 @@ function Landing() {
               <button
                 className="button primary"
                 onClick={() => {
-                  navigate("/login/worker");
+                  const user = getStoredUser();
+                  if (user && user.role === "worker") {
+                    navigate("/worker/dashboard");
+                  } else {
+                    navigate("/login/worker");
+                  }
                 }}
               >
                 {t.findWork} <ArrowRight size={18} />
@@ -309,7 +314,11 @@ function ChooseRole() {
   const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
 
   const handleWorkerClick = () => {
-    navigate("/login/worker");
+    if (currentUser && currentUser.role === "worker") {
+      navigate("/worker/dashboard");
+    } else {
+      navigate("/login/worker");
+    }
   };
 
   const handleEmployerClick = () => {
@@ -448,6 +457,7 @@ function Onboarding() {
   const [speechError, setSpeechError] = useState("");
   const [recorder, setRecorder] = useState(null);
 
+
   const [preferredLanguageCode, setPreferredLanguageCode] = useState(
     () => localStorage.getItem("kaamsetu_language") || "hi-IN"
   );
@@ -584,6 +594,7 @@ function Onboarding() {
     }
   };
 
+
   if (!mode) {
     return (
       <div className="entry-shell">
@@ -614,8 +625,8 @@ function Onboarding() {
               </div>
               <ArrowRight size={20} />
             </button>
-          </div>
 
+          </div>
           <p className="privacy-note">
             <ShieldCheck size={16} /> Your answers are only used to find better work.
           </p>
@@ -623,6 +634,8 @@ function Onboarding() {
       </div>
     );
   }
+
+
 
   return (
     <div className="conversation-shell">
@@ -1382,6 +1395,7 @@ function WorkerDashboard() {
                 <ArrowRight size={18} />
               </button>
             </div>
+
 
             <div
               className="proof-strip"
