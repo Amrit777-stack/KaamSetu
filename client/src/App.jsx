@@ -10,7 +10,6 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  CircleHelp,
   Languages,
   LogOut,
   MapPin,
@@ -34,7 +33,9 @@ import {
   getFallbackQuestion,
 } from "./services/questionSpeech.js";
 import { submitVoiceResponse } from "./services/voiceResponse.js";
+import { dashboardTranslations, occupationTranslations } from "./services/dashboardTranslations.js";
 import "./App.css";
+import "./LanguageSelect.css";
 
 const languages = [
   { name: "हिंदी", english: "Hindi", code: "HI", languageCode: "hi-IN" },
@@ -81,17 +82,47 @@ function Logo() {
 
 function Header({ back, progress }) {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(getStoredUser());
+  const [currentUser, setCurrentUser] = useState(getStoredUser);
+  const [currentLang, setCurrentLang] = useState(
+    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
+  );
 
   useEffect(() => {
-    setCurrentUser(getStoredUser());
+    const handleStorage = () => {
+      setCurrentUser(getStoredUser());
+      setCurrentLang(localStorage.getItem("kaamsetu_language") || "hi-IN");
+    };
+    const handleLangChange = (e) => {
+      const code = e.detail || localStorage.getItem("kaamsetu_language") || "hi-IN";
+      setCurrentLang(code);
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("kaamsetu_language_changed", handleLangChange);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("kaamsetu_language_changed", handleLangChange);
+    };
   }, []);
+
+  const handleLanguageSelect = (langCode) => {
+    localStorage.setItem("kaamsetu_language", langCode);
+    setCurrentLang(langCode);
+    window.dispatchEvent(
+      new CustomEvent("kaamsetu_language_changed", { detail: langCode })
+    );
+    prefetchQuestionTranslations(
+      questions.map((question) => question[1]),
+      langCode
+    ).catch(() => {});
+  };
 
   const handleLogout = () => {
     setStoredUser(null);
     setCurrentUser(null);
     navigate("/");
   };
+
+  const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
 
   return (
     <header className="app-header">
@@ -102,7 +133,27 @@ function Header({ back, progress }) {
           <div><i style={{ width: `${progress}%` }} /></div>
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {/* Top-right language selector tab for all 6 languages */}
+        <div className="language-selector-wrap" title="Change Language / भाषा बदलें">
+          <label className="language-button" htmlFor="top-language-select">
+            <Languages size={16} />
+            <select
+              id="top-language-select"
+              value={currentLang}
+              onChange={(e) => handleLanguageSelect(e.target.value)}
+              aria-label="Select Language"
+            >
+              {languages.map((l) => (
+                <option key={l.languageCode} value={l.languageCode}>
+                  {l.name} ({l.code})
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} />
+          </label>
+        </div>
+
         {currentUser ? (
           <div className="header-user">
             <button
@@ -111,7 +162,7 @@ function Header({ back, progress }) {
               title="Go to dashboard"
             >
               <User size={15} />
-              <span>{currentUser.name} ({currentUser.role === "worker" ? "Job Seeker" : "Employer"})</span>
+              <span>{currentUser.name} ({currentUser.role === "worker" ? t.jobSeeker : "Employer"})</span>
             </button>
             <button className="logout-btn" onClick={handleLogout} title="Sign out">
               <LogOut size={16} /> Sign out
@@ -125,13 +176,9 @@ function Header({ back, progress }) {
             <button className="button primary small" onClick={() => navigate("/signup")} style={{ padding: "8px 14px", fontSize: "13px" }}>
               <UserPlus size={15} /> Sign Up
             </button>
-            {back ? (
+            {back && (
               <button className="text-button" onClick={() => navigate(back)}>
                 <ArrowLeft size={17} /> Back
-              </button>
-            ) : (
-              <button className="language-button">
-                <Languages size={17} /> English <ChevronDown size={15} />
               </button>
             )}
           </>
@@ -284,6 +331,10 @@ function ChooseRole() {
 
 function Language() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const targetMode = searchParams.get("mode");
+
   const [selected, setSelected] = useState(() => {
     const saved = localStorage.getItem("kaamsetu_language");
     return languages.find((language) => language.languageCode === saved)?.name || "हिंदी";
@@ -292,6 +343,9 @@ function Language() {
   const chooseLanguage = (language) => {
     setSelected(language.name);
     localStorage.setItem("kaamsetu_language", language.languageCode);
+    window.dispatchEvent(
+      new CustomEvent("kaamsetu_language_changed", { detail: language.languageCode })
+    );
     prefetchQuestionTranslations(
       questions.map((question) => question[1]),
       language.languageCode
@@ -301,11 +355,14 @@ function Language() {
   const continueToOnboarding = () => {
     const language = languages.find((item) => item.name === selected) || languages[0];
     localStorage.setItem("kaamsetu_language", language.languageCode);
+    window.dispatchEvent(
+      new CustomEvent("kaamsetu_language_changed", { detail: language.languageCode })
+    );
     prefetchQuestionTranslations(
       questions.map((question) => question[1]),
       language.languageCode
     ).catch((error) => console.error("Question prefetch failed:", error));
-    navigate("/onboarding");
+    navigate(targetMode ? `/onboarding?mode=${targetMode}` : "/onboarding");
   };
 
   return (
@@ -347,7 +404,9 @@ function Language() {
 
 function Onboarding() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState(null);
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const [mode, setMode] = useState(() => searchParams.get("mode"));
   const [step, setStep] = useState(0);
   const [listening, setListening] = useState(false);
   const [answer, setAnswer] = useState("");
@@ -360,8 +419,18 @@ function Onboarding() {
   const [speechError, setSpeechError] = useState("");
   const [recorder, setRecorder] = useState(null);
 
-  const preferredLanguageCode =
-    localStorage.getItem("kaamsetu_language") || "hi-IN";
+  const [preferredLanguageCode, setPreferredLanguageCode] = useState(
+    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
+  );
+
+  useEffect(() => {
+    const handleLangChange = (e) => {
+      const code = e.detail || localStorage.getItem("kaamsetu_language") || "hi-IN";
+      setPreferredLanguageCode(code);
+    };
+    window.addEventListener("kaamsetu_language_changed", handleLangChange);
+    return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
+  }, []);
 
   const next = (overrideAnswer = "") => {
     const newAnswers = [...answers];
@@ -391,12 +460,6 @@ function Onboarding() {
 
     let ignoreResult = false;
     const englishText = questions[step][1];
-    const initialText =
-      getFallbackQuestion(englishText, preferredLanguageCode) ||
-      questions[step][0];
-
-    setTranslatedQuestion(initialText);
-    setTranslationError("");
 
     translateQuestion(englishText, preferredLanguageCode)
       .then((translation) => {
@@ -413,12 +476,17 @@ function Onboarding() {
     };
   }, [mode, preferredLanguageCode, step]);
 
+  const currentQuestionDisplay =
+    translatedQuestion ||
+    getFallbackQuestion(questions[step][1], preferredLanguageCode) ||
+    questions[step][0];
+
   const playQuestion = async () => {
-    if (!translatedQuestion) return;
+    if (!currentQuestionDisplay) return;
 
     try {
       setIsSpeaking(true);
-      await speakText(translatedQuestion, preferredLanguageCode);
+      await speakText(currentQuestionDisplay, preferredLanguageCode);
     } catch (error) {
       console.error("Question TTS failed:", error);
       setSpeechError("Could not play the question. You can still answer by speaking.");
@@ -554,15 +622,13 @@ function Onboarding() {
             className="listen-question"
             aria-label="Listen to question"
             onClick={playQuestion}
-            disabled={mode === "voice" && (!translatedQuestion || isSpeaking)}
+            disabled={mode === "voice" && isSpeaking}
           >
             <Volume2 size={18} />
           </button>
 
           <p className="hindi-question">
-            {mode === "voice"
-              ? translatedQuestion || getFallbackQuestion(questions[step][1], preferredLanguageCode) || questions[step][0]
-              : getFallbackQuestion(questions[step][1], preferredLanguageCode) || questions[step][0]}
+            {currentQuestionDisplay}
           </p>
 
           <p className="translation">
@@ -613,10 +679,110 @@ function Onboarding() {
                 Continue <ArrowRight size={17} />
               </button>
             )}
+
+            {/* In Voice Mode: Maintain manual fill option if user wants to enter manually */}
+            <div
+              style={{
+                marginTop: "24px",
+                borderTop: "1px dashed var(--line)",
+                paddingTop: "16px",
+                width: "100%",
+                maxWidth: "460px",
+                marginLeft: "auto",
+                marginRight: "auto",
+                textAlign: "left",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "8px",
+                }}
+              >
+                <span style={{ fontSize: "13px", color: "var(--muted)", fontWeight: "600" }}>
+                  Or enter details manually:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMode("write")}
+                  style={{
+                    background: "transparent",
+                    border: 0,
+                    color: "var(--green)",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  <PenLine size={13} /> Full typing mode
+                </button>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  placeholder={
+                    step === 0
+                      ? "e.g. Raju Kumar"
+                      : step === 1
+                        ? "e.g. Welder"
+                        : "e.g. 4 years"
+                  }
+                  style={{
+                    flex: 1,
+                    padding: "10px 14px",
+                    border: "1px solid #cfd7cd",
+                    borderRadius: "6px",
+                    fontSize: "14px",
+                    outlineColor: "var(--green)",
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && answer.trim()) {
+                      next();
+                    }
+                  }}
+                />
+                <button
+                  className="button primary"
+                  disabled={!answer.trim()}
+                  onClick={() => next()}
+                  style={{ padding: "10px 18px", fontSize: "13px", whiteSpace: "nowrap" }}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
           </section>
         ) : (
           <section className="write-answer">
-            <label htmlFor="response">Your answer</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <label htmlFor="response" style={{ margin: 0, fontWeight: "700", fontSize: "13px" }}>
+                Your answer
+              </label>
+              <button
+                type="button"
+                onClick={() => setMode("voice")}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  color: "var(--green)",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                <Mic size={14} /> Prefer speaking? Switch to Voice
+              </button>
+            </div>
             <input
               id="response"
               autoFocus
@@ -624,10 +790,10 @@ function Onboarding() {
               onChange={(event) => setAnswer(event.target.value)}
               placeholder={
                 step === 0
-                  ? "e.g. Sunil Sharma"
+                  ? "e.g. Raju Kumar"
                   : step === 1
-                    ? "e.g. Electrician"
-                    : "e.g. 5 years"
+                    ? "e.g. Welder"
+                    : "e.g. 4 years"
               }
             />
             <button
@@ -719,13 +885,13 @@ function Auth({ initialMode = "login", initialRole }) {
       }
       setStoredUser({
         id: "demo-worker",
-        name: "Worker",
+        name: "Raju Kumar",
         mobile: mobile.trim(),
         role: "worker",
         occupation: "Welder",
         location: "Pune",
       });
-      navigate("/language");
+      navigate("/worker/dashboard");
       return;
     }
 
@@ -991,75 +1157,49 @@ function Auth({ initialMode = "login", initialRole }) {
 }
 
 /**
- * WORKER DASHBOARD: "What I Applied For" + "Browse & Apply for Jobs"
+ * WORKER DASHBOARD: "Post new oppurtunity" + "See your progress"
  */
 function WorkerDashboard() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(getStoredUser());
-  const [activeTab, setActiveTab] = useState("applied"); // "applied" | "browse"
-  const [applications, setApplications] = useState([]);
-  const [availableJobs, setAvailableJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [applyingId, setApplyingId] = useState(null);
-  const [banner, setBanner] = useState(null);
-
-  const loadData = async () => {
-    const user = getStoredUser();
-    if (!user || user.role !== "worker") {
-      navigate("/login?role=worker");
-      return;
-    }
-    setCurrentUser(user);
-
-    try {
-      setLoading(true);
-      const [appsRes, jobsRes] = await Promise.all([
-        apiRequest(`/applications?worker_id=${user.profileId}`),
-        apiRequest("/jobs"),
-      ]);
-      setApplications(appsRes.data || []);
-      setAvailableJobs(jobsRes.data || []);
-    } catch (err) {
-      setBanner({ type: "error", title: "Error", message: err.message });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [currentUser] = useState(() => getStoredUser() || {
+    name: "Raju Kumar",
+    occupation: "Welder",
+    location: "Pune",
+    role: "worker",
+  });
+  const [activeTab, setActiveTab] = useState("post"); // "post" | "progress"
+  const [currentLang, setCurrentLang] = useState(
+    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
+  );
 
   useEffect(() => {
-    loadData();
-  }, [navigate]);
+    const handleLangChange = (e) => {
+      const code = e.detail || localStorage.getItem("kaamsetu_language") || "hi-IN";
+      setCurrentLang(code);
+    };
+    window.addEventListener("kaamsetu_language_changed", handleLangChange);
+    return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
+  }, []);
 
-  const handleApply = async (job) => {
-    try {
-      setApplyingId(job.id);
-      await apiRequest("/applications/apply", {
-        method: "POST",
-        body: JSON.stringify({
-          workerId: currentUser.profileId,
-          workerName: currentUser.name,
-          jobId: job.id,
-        }),
-      });
+  const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
 
-      setBanner({
-        type: "success",
-        title: "Application Submitted!",
-        message: `You successfully applied for ${job.title} at ${job.company_name}. Track it under 'What I Applied For'.`,
-      });
+  const localizedOccupation =
+    occupationTranslations[currentLang]?.[currentUser.occupation] ||
+    currentUser.occupation ||
+    "Welder";
 
-      // Refresh applications
-      const appsRes = await apiRequest(`/applications?worker_id=${currentUser.profileId}`);
-      setApplications(appsRes.data || []);
-      setActiveTab("applied");
-    } catch (err) {
-      setBanner({ type: "error", title: "Cannot Apply", message: err.message });
-    } finally {
-      setApplyingId(null);
-    }
-  };
-
-  if (!currentUser) return null;
+  const localizedCity =
+    currentLang === "hi-IN"
+      ? "पुणे"
+      : currentLang === "ta-IN"
+        ? "புனே"
+        : currentLang === "te-IN"
+          ? "పుణె"
+          : currentLang === "mr-IN"
+            ? "पुणे"
+            : currentLang === "kn-IN"
+              ? "ಪುಣೆ"
+              : "Pune";
 
   return (
     <div className="site-shell">
@@ -1070,150 +1210,301 @@ function WorkerDashboard() {
           <div className="worker-profile-left">
             <div className="worker-avatar-large">{currentUser.name ? currentUser.name[0] : "W"}</div>
             <div className="worker-details">
-              <h2>{currentUser.name} <BadgeCheck size={20} style={{ color: "var(--green)", verticalAlign: "middle" }} /></h2>
+              <h2>
+                {currentUser.name || "Raju Kumar"}{" "}
+                <BadgeCheck size={20} style={{ color: "var(--green)", verticalAlign: "middle" }} />
+              </h2>
               <p>
-                {currentUser.occupation || "Skilled Specialist"} · {currentUser.location || "Pune"}
+                {localizedOccupation} · {localizedCity}
               </p>
             </div>
           </div>
           <div>
-            {currentUser.isAvailable !== false ? (
-              <span className="badge badge-applied" style={{ padding: "8px 16px", fontSize: "13px" }}>
-                <CheckCircle2 size={16} /> Available for Work
-              </span>
-            ) : (
-              <span className="badge badge-withdrawn" style={{ padding: "8px 16px", fontSize: "13px" }}>
-                <BadgeCheck size={16} /> Employed / Hired
-              </span>
-            )}
+            <span className="badge badge-applied" style={{ padding: "8px 16px", fontSize: "13px" }}>
+              <CheckCircle2 size={16} /> {t.availableForWork}
+            </span>
           </div>
         </div>
-
-        {banner && (
-          <div className={`banner ${banner.type}`}>
-            {banner.type === "success" && <CheckCircle2 size={22} />}
-            {banner.type === "error" && <AlertCircle size={22} />}
-            {banner.type === "info" && <Sparkles size={22} />}
-            <div>
-              <strong>{banner.title}</strong>
-              <span>{banner.message}</span>
-            </div>
-          </div>
-        )}
 
         {/* Dashboard Tabs */}
         <div className="dashboard-tabs">
           <button
-            className={`dash-tab ${activeTab === "applied" ? "active" : ""}`}
-            onClick={() => setActiveTab("applied")}
+            className={`dash-tab ${activeTab === "post" ? "active" : ""}`}
+            onClick={() => setActiveTab("post")}
           >
-            <BriefcaseBusiness size={18} /> What I Applied For ({applications.length})
+            <PlusCircle size={18} /> {t.postTab}
           </button>
           <button
-            className={`dash-tab ${activeTab === "browse" ? "active" : ""}`}
-            onClick={() => setActiveTab("browse")}
+            className={`dash-tab ${activeTab === "progress" ? "active" : ""}`}
+            onClick={() => setActiveTab("progress")}
           >
-            <Sparkles size={18} /> Browse & Apply for Jobs ({availableJobs.length})
+            <BriefcaseBusiness size={18} /> {t.progressTab}
           </button>
         </div>
 
-        {loading ? (
-          <div className="empty-state">Loading your dashboard...</div>
-        ) : activeTab === "applied" ? (
-          /* TAB 1: What I Applied For */
-          applications.length === 0 ? (
-            <div className="empty-state">
-              <p>You have not applied for any jobs yet.</p>
-              <button className="button primary small" onClick={() => setActiveTab("browse")}>
-                Browse Available Jobs &rarr;
+        {activeTab === "post" ? (
+          /* TAB 1: Post new oppurtunity */
+          <div
+            className="post-opportunity-panel"
+            style={{
+              background: "#fff",
+              border: "1px solid var(--line)",
+              borderRadius: "12px",
+              padding: "36px 28px",
+              textAlign: "center",
+              boxShadow: "0 4px 20px #122c1b05",
+            }}
+          >
+            <div
+              style={{
+                width: "72px",
+                height: "72px",
+                borderRadius: "50%",
+                background: "#eaf0dd",
+                color: "var(--green)",
+                display: "grid",
+                placeItems: "center",
+                margin: "0 auto 16px",
+              }}
+            >
+              <Mic size={34} />
+            </div>
+
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "#f0f5ea",
+                color: "var(--green)",
+                padding: "4px 12px",
+                borderRadius: "20px",
+                fontSize: "12px",
+                fontWeight: "700",
+                marginBottom: "12px",
+              }}
+            >
+              <Sparkles size={14} /> {t.voiceBadge}
+            </div>
+
+            <h2 style={{ fontSize: "24px", margin: "0 0 10px", letterSpacing: "-0.5px" }}>
+              {t.postHeading}
+            </h2>
+            <p
+              style={{
+                color: "var(--muted)",
+                maxWidth: "540px",
+                margin: "0 auto 26px",
+                fontSize: "15px",
+                lineHeight: "1.6",
+              }}
+            >
+              {t.postDesc}
+            </p>
+
+            {/* BOTH Speech and Manual Fill Options */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                gap: "16px",
+                maxWidth: "640px",
+                margin: "0 auto 30px",
+                textAlign: "left",
+              }}
+            >
+              <button
+                className="mode-option featured"
+                onClick={() => navigate("/onboarding?mode=voice")}
+                style={{ cursor: "pointer", border: "2px solid var(--green)", padding: "18px" }}
+              >
+                <span className="mode-icon"><Mic size={26} /></span>
+                <div>
+                  <span className="recommended">Recommended</span>
+                  <h3 style={{ margin: "4px 0 6px", fontSize: "16px" }}>{t.speakBtn}</h3>
+                  <p style={{ margin: 0, fontSize: "13px", color: "var(--muted)" }}>{t.speakSub}</p>
+                </div>
+                <ArrowRight size={18} />
+              </button>
+
+              <button
+                className="mode-option"
+                onClick={() => navigate("/onboarding?mode=write")}
+                style={{ cursor: "pointer", padding: "18px" }}
+              >
+                <span className="mode-icon write"><PenLine size={26} /></span>
+                <div>
+                  <h3 style={{ margin: "4px 0 6px", fontSize: "16px" }}>{t.writeBtn}</h3>
+                  <p style={{ margin: 0, fontSize: "13px", color: "var(--muted)" }}>{t.writeSub}</p>
+                </div>
+                <ArrowRight size={18} />
               </button>
             </div>
-          ) : (
+
+            <div
+              className="proof-strip"
+              style={{
+                maxWidth: "600px",
+                margin: "0 auto",
+                padding: "18px 0 0",
+                borderTop: "1px solid var(--line)",
+              }}
+            >
+              <div>
+                <strong>{t.speakFeatureTitle}</strong>
+                <span>{t.speakFeatureSub}</span>
+              </div>
+              <div>
+                <strong>{t.instantExtractionTitle}</strong>
+                <span>{t.instantExtractionSub}</span>
+              </div>
+              <div>
+                <strong>{t.fairOppsTitle}</strong>
+                <span>{t.fairOppsSub}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* TAB 2: See your progress */
+          <div>
+            {/* Top stats */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "14px",
+                marginBottom: "22px",
+              }}
+            >
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid var(--line)",
+                  borderRadius: "10px",
+                  padding: "16px 20px",
+                }}
+              >
+                <span
+                  style={{
+                    color: "var(--muted)",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {t.passportStatus}
+                </span>
+                <h3
+                  style={{
+                    margin: "4px 0 0",
+                    color: "var(--green)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <CheckCircle2 size={18} /> {t.activeVerified}
+                </h3>
+              </div>
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid var(--line)",
+                  borderRadius: "10px",
+                  padding: "16px 20px",
+                }}
+              >
+                <span
+                  style={{
+                    color: "var(--muted)",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {t.matchedOpps}
+                </span>
+                <h3 style={{ margin: "4px 0 0" }}>{t.trackedCount}</h3>
+              </div>
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid var(--line)",
+                  borderRadius: "10px",
+                  padding: "16px 20px",
+                }}
+              >
+                <span
+                  style={{
+                    color: "var(--muted)",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {t.topMatchRate}
+                </span>
+                <h3 style={{ margin: "4px 0 0", color: "var(--green)" }}>{t.fitRate}</h3>
+              </div>
+            </div>
+
+            {/* Application Progress Cards */}
             <div className="candidate-grid">
-              {applications.map((app) => {
-                const isHired = app.status === "hired";
-                const isWithdrawn = app.status === "withdrawn";
+              {t.apps.map((app, idx) => {
+                const isShortlisted = idx === 0;
+                const isUnderReview = idx === 2;
+                const statusLabel = isShortlisted
+                  ? t.statusShortlisted
+                  : isUnderReview
+                    ? t.statusUnderReview
+                    : t.statusApplied;
+                const statusClass = isShortlisted
+                  ? "shortlisted"
+                  : isUnderReview
+                    ? "under_review"
+                    : "applied";
 
                 return (
-                  <div
-                    key={app.id}
-                    className={`app-card ${isHired ? "is-hired" : ""} ${isWithdrawn ? "is-withdrawn" : ""}`}
-                  >
+                  <div key={idx} className={`app-card ${isShortlisted ? "is-hired" : ""}`}>
                     <div className="app-card-left">
                       <div className="app-avatar">
                         <BriefcaseBusiness size={20} />
                       </div>
                       <div className="app-info">
-                        <h3>{app.job_title}</h3>
+                        <h3>{app.jobTitle}</h3>
                         <div className="app-meta">
-                          <span><Building2 size={14} /> <strong>{app.company_name}</strong></span>
+                          <span>
+                            <Building2 size={14} /> <strong>{app.company}</strong>
+                          </span>
+                          <span>
+                            <MapPin size={14} /> {app.location}
+                          </span>
+                          <span>💰 {app.salary}</span>
                         </div>
-                        {isWithdrawn && (
-                          <p style={{ color: "#8a574e", fontSize: "12px", margin: "6px 0 0" }}>
-                            ℹ️ Automatically withdrawn because you were hired for another position.
-                          </p>
-                        )}
-                        {isHired && (
-                          <p style={{ color: "var(--green)", fontSize: "12px", margin: "6px 0 0", fontWeight: "bold" }}>
-                            🎉 Congratulations! You were selected and hired for this job!
-                          </p>
-                        )}
+                        <p
+                          style={{
+                            color: isShortlisted ? "var(--green)" : "var(--muted)",
+                            fontSize: "13px",
+                            margin: "6px 0 0",
+                            fontWeight: isShortlisted ? "600" : "normal",
+                          }}
+                        >
+                          {isShortlisted ? "🎉 " : "ℹ️ "}
+                          {app.note}
+                        </p>
                       </div>
                     </div>
 
                     <div className="app-card-right">
-                      <span className={`badge badge-${app.status}`}>
-                        {isHired && <BadgeCheck size={14} />}
-                        {isWithdrawn && <X size={14} />}
-                        {app.status === "withdrawn" ? "Withdrawn (Hired elsewhere)" : app.status}
+                      <span className={`badge badge-${statusClass}`}>
+                        {isShortlisted && <BadgeCheck size={14} />}
+                        {statusLabel}
                       </span>
                     </div>
                   </div>
                 );
               })}
             </div>
-          )
-        ) : (
-          /* TAB 2: Browse & Apply */
-          <div>
-            {availableJobs.map((job) => {
-              const alreadyApplied = applications.some((a) => a.job_id === job.id);
-
-              return (
-                <div key={job.id} className="job-apply-card">
-                  <div className="job-apply-card-left">
-                    <h3 style={{ margin: "0 0 6px", fontSize: "18px" }}>{job.title}</h3>
-                    <div className="app-meta" style={{ marginBottom: "10px" }}>
-                      <span><Building2 size={14} /> <strong>{job.company_name}</strong></span>
-                      <span><MapPin size={14} /> {job.location}</span>
-                      <span>💰 ₹{job.salary_min?.toLocaleString()} - ₹{job.salary_max?.toLocaleString()}/mo</span>
-                    </div>
-                    <p style={{ margin: "0 0 10px", color: "var(--muted)", fontSize: "14px" }}>{job.description}</p>
-                    <div className="job-tags">
-                      <span className="tag">{job.openings} openings</span>
-                      <span className="tag">{job.shift} shift</span>
-                      <span className="tag">{job.required_experience} yrs min exp</span>
-                    </div>
-                  </div>
-
-                  <div className="job-apply-card-right">
-                    {alreadyApplied ? (
-                      <span className="badge badge-applied">
-                        <Check size={14} /> Applied
-                      </span>
-                    ) : (
-                      <button
-                        className="button primary small"
-                        disabled={applyingId === job.id}
-                        onClick={() => handleApply(job)}
-                      >
-                        {applyingId === job.id ? "Submitting..." : "Apply Now"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
       </main>
@@ -1226,7 +1517,7 @@ function WorkerDashboard() {
  */
 function Employer() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(getStoredUser());
+  const [currentUser] = useState(getStoredUser);
   const [activeTab, setActiveTab] = useState("jobs"); // "jobs" | "candidates"
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -1245,9 +1536,11 @@ function Employer() {
 
   const employerId = currentUser?.role === "employer" ? currentUser.profileId : 1;
 
-  const loadData = async () => {
-    try {
+  const loadData = async (showSpinner = false) => {
+    if (showSpinner) {
       setLoading(true);
+    }
+    try {
       const [jobsRes, appsRes] = await Promise.all([
         apiRequest(`/jobs?employer_id=${employerId}`),
         apiRequest("/applications"),
@@ -1265,15 +1558,35 @@ function Employer() {
     const user = getStoredUser();
     if (!user) {
       navigate("/login?role=employer");
-      return;
+      return undefined;
     }
     if (user.role !== "employer") {
       navigate("/worker/dashboard");
-      return;
+      return undefined;
     }
-    setCurrentUser(user);
-    loadData();
-  }, [navigate]);
+
+    let isMounted = true;
+    Promise.all([
+      apiRequest(`/jobs?employer_id=${employerId}`),
+      apiRequest("/applications"),
+    ])
+      .then(([jobsRes, appsRes]) => {
+        if (!isMounted) return;
+        setJobs(jobsRes.data || []);
+        setApplications(appsRes.data || []);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setBanner({ type: "error", title: "Error loading data", message: err.message });
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [employerId, navigate]);
 
   const handleHire = async (app) => {
     try {
