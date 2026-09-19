@@ -6,6 +6,17 @@ let fallbackUsers = [
   {
     id: 1,
     name: "Raju Kumar",
+    email: "worker1@kaamsetu.demo",
+    password: "password123",
+    role: "worker",
+    profile_id: 1,
+    occupation: "Welder",
+    location: "Pune",
+    is_available: true,
+  },
+  {
+    id: 1,
+    name: "Raju Kumar",
     email: "raju@example.test",
     password: "password123",
     role: "worker",
@@ -49,6 +60,16 @@ let fallbackUsers = [
   },
 
   // Employers
+  {
+    id: 501,
+    name: "Shakti Industries South 001",
+    email: "employer501@kaamsetu.demo",
+    password: "password123",
+    role: "employer",
+    profile_id: 501,
+    company_name: "Shakti Industries South 001",
+    location: "Pune",
+  },
   {
     id: 5,
     name: "Amit Shah",

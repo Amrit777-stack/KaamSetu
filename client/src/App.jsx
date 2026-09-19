@@ -36,6 +36,7 @@ import {
 } from "./services/questionSpeech.js";
 import { submitVoiceResponse } from "./services/voiceResponse.js";
 import { dashboardTranslations, occupationTranslations } from "./services/dashboardTranslations.js";
+import logoImg from "./assets/logo.png";
 import "./App.css";
 import "./LanguageSelect.css";
 
@@ -54,18 +55,16 @@ const questions = [
   ["आपको इस काम का कितना अनुभव है?", "How much experience do you have?"],
 ];
 
-// Clean up any stale legacy user in localStorage on module load
-try {
-  localStorage.removeItem("kaamsetu_user");
-} catch {
-  // Ignore storage access error
-}
-
-// Helper to get / set auth state in sessionStorage
+// Helper to get / set auth state in localStorage and sessionStorage
 function getStoredUser() {
   try {
-    const raw = sessionStorage.getItem("kaamsetu_user");
-    return raw ? JSON.parse(raw) : null;
+    const raw = localStorage.getItem("kaamsetu_user") || sessionStorage.getItem("kaamsetu_user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && parsed.id && parsed.role) {
+      return parsed;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -73,9 +72,12 @@ function getStoredUser() {
 
 function setStoredUser(user) {
   try {
-    if (user) {
-      sessionStorage.setItem("kaamsetu_user", JSON.stringify(user));
+    if (user && user.id && user.role) {
+      const serialized = JSON.stringify(user);
+      localStorage.setItem("kaamsetu_user", serialized);
+      sessionStorage.setItem("kaamsetu_user", serialized);
     } else {
+      localStorage.removeItem("kaamsetu_user");
       sessionStorage.removeItem("kaamsetu_user");
     }
   } catch {
@@ -87,9 +89,8 @@ function setStoredUser(user) {
 function Logo() {
   const navigate = useNavigate();
   return (
-    <button className="brand" onClick={() => navigate("/")} aria-label="KaamSetu home">
-      <span className="brand-mark">K</span>
-      <span>KaamSetu</span>
+    <button className="brand" onClick={() => navigate("/")} aria-label="KaamSetu home" title="KaamSetu">
+      <img src={logoImg} alt="KaamSetu" className="brand-logo" />
     </button>
   );
 }
@@ -173,7 +174,7 @@ function Header({ back, progress }) {
           </label>
         </div>
 
-        {currentUser ? (
+        {currentUser && currentUser.id && currentUser.role ? (
           <div className="header-user">
             <button
               className="user-badge"
@@ -182,7 +183,7 @@ function Header({ back, progress }) {
             >
               <User size={15} />
               <span>
-                {currentUser.name} ({currentUser.role === "worker" ? t.jobSeeker : (t.employerRole || "Employer")})
+                {currentUser.name || currentUser.email || "User"} ({currentUser.role === "worker" ? t.jobSeeker : (t.employerRole || "Employer")})
               </span>
             </button>
             <button className="logout-btn" onClick={handleLogout} title={t.signOut || "Sign out"}>
@@ -239,7 +240,14 @@ function Landing() {
               <button
                 className="button primary"
                 onClick={() => {
-                  navigate("/login/worker");
+                  const user = getStoredUser();
+                  if (user && user.id && user.role === "worker") {
+                    navigate("/worker/dashboard");
+                  } else if (user && user.id && user.role === "employer") {
+                    navigate("/employer");
+                  } else {
+                    navigate("/login/worker");
+                  }
                 }}
               >
                 {t.findWork} <ArrowRight size={18} />
@@ -248,8 +256,10 @@ function Landing() {
                 className="button quiet"
                 onClick={() => {
                   const user = getStoredUser();
-                  if (user && user.role === "employer") {
+                  if (user && user.id && user.role === "employer") {
                     navigate("/employer");
+                  } else if (user && user.id && user.role === "worker") {
+                    navigate("/worker/dashboard");
                   } else {
                     navigate("/login/employer");
                   }
@@ -306,6 +316,45 @@ function Landing() {
             <span>{t.proofMatchSub}</span>
           </div>
         </section>
+        <section className="landing-trust-section">
+          <div className="landing-trust-inner">
+            <h2 className="landing-trust-heading">
+              500+ top companies trust <strong>KaamSetu</strong> for their hiring needs
+            </h2>
+            <div className="landing-companies-row">
+              <div className="landing-company-item">
+                <span className="company-wordmark brand-shakti">
+                  <span className="wordmark-lead">SHAKTI</span>
+                  <span className="wordmark-sub">INDUSTRY</span>
+                </span>
+              </div>
+              <div className="landing-company-divider" />
+              <div className="landing-company-item">
+                <span className="company-wordmark brand-lakshmi">
+                  <span className="wordmark-lead">Sri Lakshmi</span>
+                  <span className="wordmark-sub">Service</span>
+                </span>
+              </div>
+              <div className="landing-company-divider" />
+              <div className="landing-company-item">
+                <span className="company-wordmark brand-metro">
+                  <span className="wordmark-lead">METRO</span>
+                  <span className="wordmark-sub">WORKS</span>
+                </span>
+              </div>
+              <div className="landing-company-divider" />
+              <div className="landing-company-item">
+                <span className="company-wordmark brand-greentech">
+                  <span className="wordmark-lead">GreenTech</span>
+                  <span className="wordmark-sub">Soln</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="landing-banner-green">
+            <p className="landing-banner-text">Great opportunities start with skilled people</p>
+          </div>
+        </section>
       </main>
     </div>
   );
@@ -330,11 +379,17 @@ function ChooseRole() {
   const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
 
   const handleWorkerClick = () => {
-    navigate("/login/worker");
+    const user = getStoredUser();
+    if (user && user.id && user.role === "worker") {
+      navigate("/worker/dashboard");
+    } else {
+      navigate("/login/worker");
+    }
   };
 
   const handleEmployerClick = () => {
-    if (currentUser && currentUser.role === "employer") {
+    const user = getStoredUser();
+    if (user && user.id && user.role === "employer") {
       navigate("/employer");
     } else {
       navigate("/login/employer");
@@ -943,6 +998,17 @@ function Auth({ initialMode = "login", initialRole }) {
     return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
   }, []);
 
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user && user.id && user.role) {
+      if (user.role === "worker") {
+        navigate("/worker/dashboard", { replace: true });
+      } else {
+        navigate("/employer", { replace: true });
+      }
+    }
+  }, [navigate]);
+
   const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
 
   const [mode, setMode] = useState(initialMode); // "login" | "signup"
@@ -1274,12 +1340,7 @@ function Auth({ initialMode = "login", initialRole }) {
  */
 function WorkerDashboard() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(() => getStoredUser() || {
-    name: "Raju Kumar",
-    occupation: "Welder",
-    location: "Pune",
-    role: "worker",
-  });
+  const [currentUser, setCurrentUser] = useState(getStoredUser);
   const [activeTab, setActiveTab] = useState("post"); // "post" | "progress"
   const [progressSubTab, setProgressSubTab] = useState("applications"); // "applications" | "details"
   const [currentLang, setCurrentLang] = useState(
@@ -1679,7 +1740,9 @@ function WorkerDashboard() {
     }
 
     return unique;
-  }, [availableJobs, currentUser.occupation]);
+  }, [availableJobs, currentUser?.occupation]);
+
+  if (!currentUser || !currentUser.id) return null;
 
   return (
     <div className="site-shell">
