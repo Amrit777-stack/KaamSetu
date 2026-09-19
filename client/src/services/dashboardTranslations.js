@@ -1,9 +1,58 @@
 export const dashboardTranslations = {
   "en-IN": {
+    // Header & Role
     jobSeeker: "Job Seeker",
     availableForWork: "Available for Work",
+
+    // Landing Page
+    findWork: "Find work",
+    hiring: "I’m hiring",
+    heroEyebrow: "Work, made more human",
+    heroTitleLead: "The right work.",
+    heroTitleEm: "In your own words.",
+    heroDesc:
+      "KaamSetu connects skilled people with fair, nearby opportunities — in the language they are most comfortable with.",
+    trustPrivate: "Your information stays private",
+    trustNoEnglish: "No English required",
+    proofSpeak: "Speak naturally",
+    proofSpeakSub: "Tell us about your work",
+    proofWages: "See what’s fair",
+    proofWagesSub: "Clear wages and job terms",
+    proofMatch: "Find your fit",
+    proofMatchSub: "Matches built around you",
+
+    // Choose Role Page
+    chooseRoleStep: "Step 1 of 3",
+    chooseRoleHeading: "How can we help today?",
+    chooseRoleSub: "Choose the path that feels right for you.",
+    lookingForWorkTitle: "I’m looking for work",
+    lookingForWorkSub: "Build your profile and find jobs that match your skills.",
+    hiringTitle: "I’m hiring",
+    hiringSub: "Meet skilled, ready-to-work people near you.",
+
+    // Worker Login & Auth Form
+    workerLoginTitle: "Worker Login",
+    workerLoginSub: "Sign in to see the jobs you applied for and track status.",
+    employerLoginTitle: "Employer Sign In",
+    employerLoginSub: "Sign in to review candidates and manage your job posts.",
+    signInTab: "Sign In",
+    createAccountTab: "Create Account",
+    jobSeekerRoleTab: "Job Seeker (Worker)",
+    employerRoleTab: "Hiring (Employer)",
+    mobileLabel: "Mobile Number",
+    mobilePlaceholder: "Enter your mobile number",
+    passwordLabel: "Password",
+    passwordPlaceholder: "Enter your password",
+    loginBtn: "Login",
+    processingBtn: "Processing...",
+    quickFillLabel: "⚡ One-Click Test Accounts",
+    quickChipWorker: "Raju Kumar (9876543210)",
+    errorMissingFields: "Please enter both mobile number and password",
+
+    // Worker Dashboard Tabs
     postTab: "Post new oppurtunity",
     progressTab: "See your progress",
+
     // Post tab
     voiceBadge: "Voice-Powered Opportunity",
     postHeading: "Post a New Opportunity",
@@ -19,6 +68,7 @@ export const dashboardTranslations = {
     instantExtractionSub: "Automatic trade & experience capture",
     fairOppsTitle: "Fair Opportunities",
     fairOppsSub: "Direct matching with verified local employers",
+
     // Progress tab
     passportStatus: "Skill Passport Status",
     activeVerified: "Active & Verified",
@@ -57,10 +107,59 @@ export const dashboardTranslations = {
     ],
   },
   "hi-IN": {
+    // Header & Role
     jobSeeker: "कार्यकर्ता / कामगार",
     availableForWork: "काम के लिए उपलब्ध",
+
+    // Landing Page
+    findWork: "काम खोजें",
+    hiring: "मुझे कामगार चाहिए",
+    heroEyebrow: "रोजगार, अब और भी आसान",
+    heroTitleLead: "सही काम।",
+    heroTitleEm: "अपनी ही भाषा में।",
+    heroDesc:
+      "कामसेतु कुशल कामगारों को उनकी अपनी भाषा में उचित और नजदीकी रोजगार अवसरों से जोड़ता है।",
+    trustPrivate: "आपकी जानकारी सुरक्षित और निजी रहती है",
+    trustNoEnglish: "अंग्रेज़ी की कोई आवश्यकता नहीं",
+    proofSpeak: "स्वाभाविक रूप से बोलें",
+    proofSpeakSub: "हमें अपने काम के बारे में बताएं",
+    proofWages: "उचित वेतन जानें",
+    proofWagesSub: "स्पष्ट वेतन और काम की शर्तें",
+    proofMatch: "मनपसंद काम पाएं",
+    proofMatchSub: "आपके हुनर के अनुसार मिलान",
+
+    // Choose Role Page
+    chooseRoleStep: "चरण 1 / 3",
+    chooseRoleHeading: "आज हम आपकी कैसे मदद कर सकते हैं?",
+    chooseRoleSub: "वह विकल्प चुनें जो आपके लिए सही हो।",
+    lookingForWorkTitle: "मुझे काम चाहिए",
+    lookingForWorkSub: "अपनी प्रोफाइल बनाएं और अपने कौशल के अनुसार काम पाएं।",
+    hiringTitle: "मुझे कामगार चाहिए",
+    hiringSub: "अपने नजदीकी कुशल और काम के लिए तैयार लोगों से जुड़ें।",
+
+    // Worker Login & Auth Form
+    workerLoginTitle: "कामगार लॉगिन (Worker Login)",
+    workerLoginSub: "जिन नौकरियों के लिए आपने आवेदन किया है उन्हें देखने और स्थिति ट्रैक करने के लिए लॉगिन करें।",
+    employerLoginTitle: "नियोक्ता लॉगिन (Employer Sign In)",
+    employerLoginSub: "उम्मीदवारों की समीक्षा करने और अपनी नौकरियों को प्रबंधित करने के लिए साइन इन करें।",
+    signInTab: "साइन इन (Sign In)",
+    createAccountTab: "नया खाता बनाएं",
+    jobSeekerRoleTab: "काम की तलाश (कामगार)",
+    employerRoleTab: "काम पर रखने वाले (नियोक्ता)",
+    mobileLabel: "मोबाइल नंबर",
+    mobilePlaceholder: "अपना मोबाइल नंबर दर्ज करें",
+    passwordLabel: "पासवर्ड",
+    passwordPlaceholder: "अपना पासवर्ड दर्ज करें",
+    loginBtn: "लॉगिन करें",
+    processingBtn: "प्रक्रिया जारी है...",
+    quickFillLabel: "⚡ एक-क्लिक टेस्ट खाता",
+    quickChipWorker: "राजु कुमार (9876543210)",
+    errorMissingFields: "कृपया मोबाइल नंबर और पासवर्ड दोनों दर्ज करें",
+
+    // Worker Dashboard Tabs
     postTab: "नया अवसर पोस्ट करें",
     progressTab: "अपनी प्रगति देखें",
+
     // Post tab
     voiceBadge: "वॉइस-आधारित अवसर",
     postHeading: "नया अवसर पोस्ट करें",
@@ -76,6 +175,7 @@ export const dashboardTranslations = {
     instantExtractionSub: "कौशल और कार्य अनुभव की स्वचालित पहचान",
     fairOppsTitle: "उचित पारदर्शी अवसर",
     fairOppsSub: "सत्यापित स्थानीय नियोक्ताओं के साथ सीधा मिलान",
+
     // Progress tab
     passportStatus: "स्किल पासपोर्ट स्थिति",
     activeVerified: "सक्रिय और सत्यापित",
@@ -114,10 +214,59 @@ export const dashboardTranslations = {
     ],
   },
   "ta-IN": {
+    // Header & Role
     jobSeeker: "வேலை நாடுநர்",
     availableForWork: "வேலைக்கு தயார்",
+
+    // Landing Page
+    findWork: "வேலை தேடவும்",
+    hiring: "நான் வேலைக்கு ஆள் எடுக்கிறேன்",
+    heroEyebrow: "வேலைவாய்ப்பு, மனிதநேயத்துடன்",
+    heroTitleLead: "சரியான வேலை.",
+    heroTitleEm: "உங்கள் சொந்த வார்த்தைகளில்.",
+    heroDesc:
+      "காம்சேது திறமையானவர்களை அவர்கள் விரும்பும் மொழியில் நியாயமான, அருகிலுள்ள வேலைவாய்ப்புகளுடன் இணைக்கிறது.",
+    trustPrivate: "உங்கள் தகவல்கள் பாதுகாப்பாக இருக்கும்",
+    trustNoEnglish: "ஆங்கிலம் தேவையில்லை",
+    proofSpeak: "இயல்பாக பேசுங்கள்",
+    proofSpeakSub: "உங்கள் வேலையைப் பற்றி சொல்லுங்கள்",
+    proofWages: "நியாயமான ஊதியம்",
+    proofWagesSub: "தெளிவான ஊதியம் மற்றும் பணி விதிகள்",
+    proofMatch: "உங்களுக்கு ஏற்ற வேலை",
+    proofMatchSub: "உங்கள் திறமைக்கேற்ற பொருத்தம்",
+
+    // Choose Role Page
+    chooseRoleStep: "படி 1 / 3",
+    chooseRoleHeading: "இன்று நாங்கள் உங்களுக்கு எப்படி உதவ முடியும்?",
+    chooseRoleSub: "உங்களுக்கு பொருத்தமான பாதையைத் தேர்ந்தெடுக்கவும்.",
+    lookingForWorkTitle: "நான் வேலை தேடுகிறேன்",
+    lookingForWorkSub: "உங்கள் சுயவிவரத்தை உருவாக்கி, உங்கள் திறமைக்கு ஏற்ற வேலைகளைக் கண்டறியவும்.",
+    hiringTitle: "நான் வேலைக்கு ஆள் எடுக்கிறேன்",
+    hiringSub: "உங்களுக்கு அருகிலுள்ள திறமையான, வேலைக்குத் தயாராக உள்ளவர்களைச் சந்திக்கவும்.",
+
+    // Worker Login & Auth Form
+    workerLoginTitle: "தொழிலாளி உள்நுழைவு (Worker Login)",
+    workerLoginSub: "நீங்கள் விண்ணப்பித்த வேலைகளைப் பார்க்கவும் நிலையை கண்காணிக்கவும் உள்நுழையவும்.",
+    employerLoginTitle: "முதலாளி உள்நுழைவு (Employer Sign In)",
+    employerLoginSub: "விண்ணப்பதாரர்களைப் பார்க்கவும் வேலை பதிவுகளை நிர்வகிக்கவும் உள்நுழையவும்.",
+    signInTab: "உள்நுழைவு (Sign In)",
+    createAccountTab: "கணக்கை உருவாக்கவும்",
+    jobSeekerRoleTab: "வேலை நாடுநர் (தொழிலாளி)",
+    employerRoleTab: "வேலை வழங்குநர் (முதலாளி)",
+    mobileLabel: "மொபைல் எண்",
+    mobilePlaceholder: "உங்கள் மொபைல் எண்ணை உள்ளிடவும்",
+    passwordLabel: "கடவுச்சொல்",
+    passwordPlaceholder: "உங்கள் கடவுச்சொல்லை உள்ளிடவும்",
+    loginBtn: "உள்நுழைக",
+    processingBtn: "செயலாக்குகிறது...",
+    quickFillLabel: "⚡ ஒரு கிளிக் சோதனை கணக்கு",
+    quickChipWorker: "ராஜு குமார் (9876543210)",
+    errorMissingFields: "மொபைல் எண் மற்றும் கடவுச்சொல் இரண்டையும் உள்ளிடவும்",
+
+    // Worker Dashboard Tabs
     postTab: "புதிய வாய்ப்பை பதிவிடவும்",
     progressTab: "உங்கள் முன்னேற்றத்தைக் காண்க",
+
     // Post tab
     voiceBadge: "குரல் வழி வாய்ப்பு பதிவு",
     postHeading: "புதிய வாய்ப்பை பதிவிடவும்",
@@ -133,6 +282,7 @@ export const dashboardTranslations = {
     instantExtractionSub: "திறன் மற்றும் பணி அனுபவத்தை தானாக அடையாளம் காணுதல்",
     fairOppsTitle: "நியாயமான வேலைவாய்ப்புகள்",
     fairOppsSub: "சரிபார்க்கப்பட்ட உள்ளூர் முதலாளிகளுடன் நேரடி இணைப்பு",
+
     // Progress tab
     passportStatus: "திறன் கடவுச்சீட்டு நிலை",
     activeVerified: "செயலில் & சரிபார்க்கப்பட்டது",
@@ -171,10 +321,59 @@ export const dashboardTranslations = {
     ],
   },
   "te-IN": {
+    // Header & Role
     jobSeeker: "ఉద్యోగార్ధి",
     availableForWork: "పనికి అందుబాటులో ఉన్నారు",
+
+    // Landing Page
+    findWork: "పనిని కనుగొనండి",
+    hiring: "నేను ఉద్యోగులను నియమిస్తున్నాను",
+    heroEyebrow: "పని, మరింత సులభంగా",
+    heroTitleLead: "సరైన పని.",
+    heroTitleEm: "మీ స్వంత మాటల్లో.",
+    heroDesc:
+      "కామ్‌సేతు నైపుణ్యం కలిగిన వ్యక్తులను వారికి అనుకూలమైన భాషలో న్యాయమైన, సమీప అవకాశాలతో కలుపుతుంది.",
+    trustPrivate: "మీ సమాచారం సురక్షితంగా ఉంటుంది",
+    trustNoEnglish: "ఇంగ్లీష్ అవసరం లేదు",
+    proofSpeak: "సహజంగా మాట్లాడండి",
+    proofSpeakSub: "మీ పని గురించి మాకు చెప్పండి",
+    proofWages: "న్యాయమైన వేతనాలు",
+    proofWagesSub: "స్పష్టమైన వేతనాలు మరియు నిబంధనలు",
+    proofMatch: "మీకు సరిపోయే పని",
+    proofMatchSub: "మీ నైపుణ్యానికి తగిన సరిపోలిక",
+
+    // Choose Role Page
+    chooseRoleStep: "దశ 1 / 3",
+    chooseRoleHeading: "ఈ రోజు మేము మీకు ఎలా సహాయపడగలము?",
+    chooseRoleSub: "మీకు సరైనదిగా అనిపించే మార్గాన్ని ఎంచుకోండి.",
+    lookingForWorkTitle: "నేను పని కోసం చూస్తున్నాను",
+    lookingForWorkSub: "మీ ప్రొఫైల్‌ను రూపొందించండి మరియు మీ నైపుణ్యాలకు సరిపోయే ఉద్యోగాలను కనుగొనండి.",
+    hiringTitle: "నేను ఉద్యోగులను నియమిస్తున్నాను",
+    hiringSub: "మీ సమీపంలోని నైపుణ్యం కలిగిన, పనికి సిద్ధంగా ఉన్న వ్యక్తులను కలవండి.",
+
+    // Worker Login & Auth Form
+    workerLoginTitle: "కార్మికుల లాగిన్ (Worker Login)",
+    workerLoginSub: "మీరు దరఖాస్తు చేసుకున్న ఉద్యోగాలను చూడటానికి మరియు స్థితిని ట్రాక్ చేయడానికి లాగిన్ అవ్వండి.",
+    employerLoginTitle: "యజమాని సైన్ ఇన్ (Employer Sign In)",
+    employerLoginSub: "అభ్యర్థులను సమీక్షించడానికి మరియు ఉద్యోగ పోస్ట్‌లను నిర్వహించడానికి సైన్ ఇన్ చేయండి.",
+    signInTab: "సైన్ ఇన్ (Sign In)",
+    createAccountTab: "కొత్త ఖాతాను సృష్టించండి",
+    jobSeekerRoleTab: "ఉద్యోగార్ధి (కార్మికుడు)",
+    employerRoleTab: "నియామకదారుడు (యజమాని)",
+    mobileLabel: "మొబైల్ నంబర్",
+    mobilePlaceholder: "మీ మొబైల్ నంబర్‌ను నమోదు చేయండి",
+    passwordLabel: "పాస్‌వర్డ్",
+    passwordPlaceholder: "మీ పాస్‌వర్డ్‌ను నమోదు చేయండి",
+    loginBtn: "లాగిన్ చేయండి",
+    processingBtn: "ప్రాసెస్ అవుతోంది...",
+    quickFillLabel: "⚡ ఒకే క్లిక్‌తో టెస్ట్ ఖాతా",
+    quickChipWorker: "రాజు కుమార్ (9876543210)",
+    errorMissingFields: "దయచేసి మొబైల్ నంబర్ మరియు పాస్‌వర్డ్ రెండింటినీ నమోదు చేయండి",
+
+    // Worker Dashboard Tabs
     postTab: "కొత్త అవకాశాన్ని పోస్ట్ చేయండి",
     progressTab: "మీ పురోగతిని చూడండి",
+
     // Post tab
     voiceBadge: "వాయిస్ ఆధారిత అవకాశం",
     postHeading: "కొత్త అవకాశాన్ని పోస్ట్ చేయండి",
@@ -190,6 +389,7 @@ export const dashboardTranslations = {
     instantExtractionSub: "నైపుణ్యం మరియు పని అనుభవాన్ని స్వయంచాలకంగా గుర్తించడం",
     fairOppsTitle: "న్యాయమైన అవకాశాలు",
     fairOppsSub: "ధృవీకరించబడిన స్థానిక యజమానులతో ప్రత్యక్ష కనెక్షన్",
+
     // Progress tab
     passportStatus: "స్కిల్ పాస్‌పోర్ట్ స్థితి",
     activeVerified: "యాక్టివ్ & ధృవీకరించబడింది",
@@ -228,10 +428,59 @@ export const dashboardTranslations = {
     ],
   },
   "kn-IN": {
+    // Header & Role
     jobSeeker: "ಉದ್ಯೋಗಾಕಾಂಕ್ಷಿ",
     availableForWork: "ಕೆಲಸಕ್ಕೆ ಲಭ್ಯವಿದೆ",
+
+    // Landing Page
+    findWork: "ಕೆಲಸ ಹುಡುಕಿ",
+    hiring: "ನಾನು ನೇಮಕ ಮಾಡುತ್ತಿದ್ದೇನೆ",
+    heroEyebrow: "ಕೆಲಸ, ಇನ್ನಷ್ಟು ಸರಳ",
+    heroTitleLead: "ಸರಿಯಾದ ಕೆಲಸ.",
+    heroTitleEm: "ನಿಮ್ಮದೇ ಮಾತುಗಳಲ್ಲಿ.",
+    heroDesc:
+      "ಕಾಮ್‌ಸೇತು ನುರಿತ ಜನರನ್ನು ಅವರಿಗೆ ಅನುಕೂಲಕರವಾದ ಭಾಷೆಯಲ್ಲಿ ನ್ಯಾಯಯುತ, ಹತ್ತಿರದ ಉದ್ಯೋಗಾವಕಾಶಗಳೊಂದಿಗೆ ಸಂಪರ್ಕಿಸುತ್ತದೆ.",
+    trustPrivate: "ನಿಮ್ಮ ಮಾಹಿತಿ ಸುರಕ್ಷಿತವಾಗಿರುತ್ತದೆ",
+    trustNoEnglish: "ಇಂಗ್ಲಿಷ್ ಅಗತ್ಯವಿಲ್ಲ",
+    proofSpeak: "ಸಹಜವಾಗಿ ಮಾತನಾಡಿ",
+    proofSpeakSub: "ನಿಮ್ಮ ಕೆಲಸದ ಬಗ್ಗೆ ನಮಗೆ ತಿಳಿಸಿ",
+    proofWages: "ನ್ಯಾಯಯುತ ವೇತನ",
+    proofWagesSub: "ಸ್ಪಷ್ಟ ವೇತನ ಮತ್ತು ಷರತ್ತುಗಳು",
+    proofMatch: "ನಿಮಗೆ ಸೂಕ್ತವಾದ ಕೆಲಸ",
+    proofMatchSub: "ನಿಮ್ಮ ಕೌಶಲ್ಯಕ್ಕೆ ತಕ್ಕ ಹೊಂದಾಣಿಕೆ",
+
+    // Choose Role Page
+    chooseRoleStep: "ಹಂತ 1 / 3",
+    chooseRoleHeading: "ನಾವು ಇಂದು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?",
+    chooseRoleSub: "ನಿಮಗೆ ಸೂಕ್ತವೆನಿಸುವ ಮಾರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    lookingForWorkTitle: "ನಾನು ಕೆಲಸ ಹುಡುಕುತ್ತಿದ್ದೇನೆ",
+    lookingForWorkSub: "ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ರಚಿಸಿ ಮತ್ತು ನಿಮ್ಮ ಕೌಶಲ್ಯಗಳಿಗೆ ಸರಿಹೊಂದುವ ಕೆಲಸಗಳನ್ನು ಹುಡುಕಿ.",
+    hiringTitle: "ನಾನು ನೇಮಕ ಮಾಡುತ್ತಿದ್ದೇನೆ",
+    hiringSub: "ನಿಮ್ಮ ಸಮೀಪದಲ್ಲಿರುವ ನುರಿತ, ಕೆಲಸಕ್ಕೆ ಸಿದ್ಧವಿರುವ ಜನರನ್ನು ಭೇಟಿ ಮಾಡಿ.",
+
+    // Worker Login & Auth Form
+    workerLoginTitle: "ಕಾರ್ಮಿಕರ ಲಾಗಿನ್ (Worker Login)",
+    workerLoginSub: "ನೀವು ಅರ್ಜಿ ಸಲ್ಲಿಸಿದ ಉದ್ಯೋಗಗಳನ್ನು ನೋಡಲು ಮತ್ತು ಸ್ಥಿತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಲು ಲಾಗಿನ್ ಮಾಡಿ.",
+    employerLoginTitle: "ಉದ್ಯೋಗದಾತರ ಸೈನ್ ಇನ್ (Employer Sign In)",
+    employerLoginSub: "ಅಭ್ಯರ್ಥಿಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಮತ್ತು ಉದ್ಯೋಗ ಪೋಸ್ಟ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಲು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    signInTab: "ಸೈನ್ ಇನ್ (Sign In)",
+    createAccountTab: "ಖಾತೆಯನ್ನು ರಚಿಸಿ",
+    jobSeekerRoleTab: "ಉದ್ಯೋಗಾಕಾಂಕ್ಷಿ (ಕಾರ್ಮಿಕ)",
+    employerRoleTab: "ನೇಮಕಾತಿದಾರ (ಉದ್ಯೋಗದಾತ)",
+    mobileLabel: "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ",
+    mobilePlaceholder: "ನಿಮ್ಮ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ",
+    passwordLabel: "ಪಾಸ್‌ವರ್ಡ್",
+    passwordPlaceholder: "ನಿಮ್ಮ ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ನಮೂದಿಸಿ",
+    loginBtn: "ಲಾಗಿನ್ ಮಾಡಿ",
+    processingBtn: "ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ...",
+    quickFillLabel: "⚡ ಒಂದೇ ಕ್ಲಿಕ್ ಪರೀಕ್ಷಾ ಖಾತೆ",
+    quickChipWorker: "ರಾಜು ಕುಮಾರ್ (9876543210)",
+    errorMissingFields: "ದಯವಿಟ್ಟು ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಎರಡನ್ನೂ ನಮೂದಿಸಿ",
+
+    // Worker Dashboard Tabs
     postTab: "ಹೊಸ ಅವಕಾಶವನ್ನು ಪೋಸ್ಟ್ ಮಾಡಿ",
     progressTab: "ನಿಮ್ಮ ಪ್ರಗತಿಯನ್ನು ನೋಡಿ",
+
     // Post tab
     voiceBadge: "ಧ್ವನಿ-ಚಾಲಿತ ಅವಕಾಶ",
     postHeading: "ಹೊಸ ಅವಕಾಶವನ್ನು ಪೋಸ್ಟ್ ಮಾಡಿ",
@@ -247,6 +496,7 @@ export const dashboardTranslations = {
     instantExtractionSub: "ಕೌಶಲ್ಯ ಮತ್ತು ಅನುಭವದ ಸ್ವಯಂಚಾಲಿತ ಸೆರೆಹಿಡಿಯುವಿಕೆ",
     fairOppsTitle: "ನ್ಯಾಯಯುತ ಉದ್ಯೋಗಾವಕಾಶಗಳು",
     fairOppsSub: "ಪರಿಶೀಲಿಸಿದ ಸ್ಥಳೀಯ ಉದ್ಯೋಗದಾತರೊಂದಿಗೆ ನೇರ ಹೊಂದಾಣಿಕೆ",
+
     // Progress tab
     passportStatus: "ಸ್ಕಿಲ್ ಪಾಸ್‌ಪೋರ್ಟ್ ಸ್ಥಿತಿ",
     activeVerified: "ಸಕ್ರಿಯ ಮತ್ತು ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
@@ -285,10 +535,59 @@ export const dashboardTranslations = {
     ],
   },
   "mr-IN": {
+    // Header & Role
     jobSeeker: "कामगार / नोकरी शोधणारा",
     availableForWork: "कामासाठी उपलब्ध",
+
+    // Landing Page
+    findWork: "काम शोधा",
+    hiring: "मला कामगार हवे आहेत",
+    heroEyebrow: "रोजगार, अधिक सुलभ आणि मानवी",
+    heroTitleLead: "योग्य काम.",
+    heroTitleEm: "तुमच्या स्वतःच्या भाषेत.",
+    heroDesc:
+      "कामसेतू कुशल लोकांना त्यांच्या सोयीच्या भाषेत योग्य आणि जवळच्या कामाच्या संधींशी जोडते.",
+    trustPrivate: "तुमची माहिती सुरक्षित आणि खाजगी राहते",
+    trustNoEnglish: "इंग्रजीची कोणतीही गरज नाही",
+    proofSpeak: "सहजपणे बोला",
+    proofSpeakSub: "आम्हाला तुमच्या कामाबद्दल सांगा",
+    proofWages: "वाजवी वेतन पहा",
+    proofWagesSub: "स्पष्ट वेतन आणि कामाच्या अटी",
+    proofMatch: "तुमच्या आवडीचे काम शोधा",
+    proofMatchSub: "तुमच्या कौशल्यानुसार जुळणी",
+
+    // Choose Role Page
+    chooseRoleStep: "टप्पा 1 / 3",
+    chooseRoleHeading: "आज आम्ही तुम्हाला कशी मदत करू शकतो?",
+    chooseRoleSub: "तुमच्यासाठी योग्य वाटणारा मार्ग निवडा.",
+    lookingForWorkTitle: "मला काम हवे आहे",
+    lookingForWorkSub: "तुमचे प्रोफाइल तयार करा आणि तुमच्या कौशल्यानुसार काम शोधा.",
+    hiringTitle: "मला कामगार हवे आहेत",
+    hiringSub: "तुमच्या जवळच्या कुशल आणि कामासाठी तयार लोकांना भेटा.",
+
+    // Worker Login & Auth Form
+    workerLoginTitle: "कामगार लॉगिन (Worker Login)",
+    workerLoginSub: "तुम्ही अर्ज केलेल्या नोकऱ्या पाहण्यासाठी आणि स्थिती ट्रॅक करण्यासाठी लॉगिन करा.",
+    employerLoginTitle: "नियोक्ता लॉगिन (Employer Sign In)",
+    employerLoginSub: "उमेदवारांचे पुनरावलोकन करण्यासाठी आणि नोकरीच्या जाहिराती व्यवस्थापित करण्यासाठी साइन इन करा.",
+    signInTab: "साइन इन (Sign In)",
+    createAccountTab: "नवीन खाते तयार करा",
+    jobSeekerRoleTab: "नोकरी शोधणारा (कामगार)",
+    employerRoleTab: "काम देणारे (नियोक्ता)",
+    mobileLabel: "मोबाईल नंबर",
+    mobilePlaceholder: "तुमचा मोबाईल नंबर प्रविष्ट करा",
+    passwordLabel: "पासवर्ड",
+    passwordPlaceholder: "तुमचा पासवर्ड प्रविष्ट करा",
+    loginBtn: "लॉगिन करा",
+    processingBtn: "प्रक्रिया सुरू आहे...",
+    quickFillLabel: "⚡ एक-क्लिक चाचणी खाते",
+    quickChipWorker: "राजू कुमार (9876543210)",
+    errorMissingFields: "कृपया मोबाईल नंबर आणि पासवर्ड दोन्ही प्रविष्ट करा",
+
+    // Worker Dashboard Tabs
     postTab: "नवीन संधी पोस्ट करा",
     progressTab: "तुमची प्रगती पहा",
+
     // Post tab
     voiceBadge: "व्हॉइस-आधारित संधी",
     postHeading: "नवीन संधी पोस्ट करा",
@@ -304,6 +603,7 @@ export const dashboardTranslations = {
     instantExtractionSub: "कौशल्य आणि अनुभवाची स्वयंचलित नोंदणी",
     fairOppsTitle: "वाजवी रोजगाराच्या संधी",
     fairOppsSub: "पडताळणी केलेल्या स्थानिक नियोक्त्यांशी थेट जुळणी",
+
     // Progress tab
     passportStatus: "स्किल पासपोर्ट स्थिती",
     activeVerified: "सक्रिय आणि सत्यापित",
@@ -351,4 +651,3 @@ export const occupationTranslations = {
   "kn-IN": { Welder: "ವೆಲ್ಡರ್ (Welder)", "Skilled Specialist": "ನುರಿತ ತಜ್ಞ" },
   "mr-IN": { Welder: "वेल्डर (Welder)", "Skilled Specialist": "कुशल तंत्रज्ञ" },
 };
-

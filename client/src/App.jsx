@@ -190,15 +190,30 @@ function Header({ back, progress }) {
 
 function Landing() {
   const navigate = useNavigate();
+  const [currentLang, setCurrentLang] = useState(
+    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
+  );
+
+  useEffect(() => {
+    const handleLangChange = (e) => {
+      const code = e.detail || localStorage.getItem("kaamsetu_language") || "hi-IN";
+      setCurrentLang(code);
+    };
+    window.addEventListener("kaamsetu_language_changed", handleLangChange);
+    return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
+  }, []);
+
+  const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
+
   return (
     <div className="site-shell">
       <Header />
       <main>
         <section className="hero-section">
           <div className="hero-copy">
-            <div className="eyebrow"><Sparkles size={15} /> Work, made more human</div>
-            <h1>The right work.<br /><em>In your own words.</em></h1>
-            <p>KaamSetu connects skilled people with fair, nearby opportunities — in the language they are most comfortable with.</p>
+            <div className="eyebrow"><Sparkles size={15} /> {t.heroEyebrow}</div>
+            <h1>{t.heroTitleLead}<br /><em>{t.heroTitleEm}</em></h1>
+            <p>{t.heroDesc}</p>
             <div className="hero-actions">
               <button
                 className="button primary"
@@ -206,7 +221,7 @@ function Landing() {
                   navigate("/login/worker");
                 }}
               >
-                Find work <ArrowRight size={18} />
+                {t.findWork} <ArrowRight size={18} />
               </button>
               <button
                 className="button quiet"
@@ -219,12 +234,12 @@ function Landing() {
                   }
                 }}
               >
-                I’m hiring
+                {t.hiring}
               </button>
             </div>
             <div className="trust-row">
-              <span><ShieldCheck size={18} /> Your information stays private</span>
-              <span><BadgeCheck size={18} /> No English required</span>
+              <span><ShieldCheck size={18} /> {t.trustPrivate}</span>
+              <span><BadgeCheck size={18} /> {t.trustNoEnglish}</span>
             </div>
           </div>
           <div className="hero-visual" aria-label="A preview of a worker profile">
@@ -258,16 +273,16 @@ function Landing() {
         </section>
         <section className="proof-strip">
           <div>
-            <strong>Speak naturally</strong>
-            <span>Tell us about your work</span>
+            <strong>{t.proofSpeak}</strong>
+            <span>{t.proofSpeakSub}</span>
           </div>
           <div>
-            <strong>See what’s fair</strong>
-            <span>Clear wages and job terms</span>
+            <strong>{t.proofWages}</strong>
+            <span>{t.proofWagesSub}</span>
           </div>
           <div>
-            <strong>Find your fit</strong>
-            <span>Matches built around you</span>
+            <strong>{t.proofMatch}</strong>
+            <span>{t.proofMatchSub}</span>
           </div>
         </section>
       </main>
@@ -278,6 +293,20 @@ function Landing() {
 function ChooseRole() {
   const navigate = useNavigate();
   const currentUser = getStoredUser();
+  const [currentLang, setCurrentLang] = useState(
+    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
+  );
+
+  useEffect(() => {
+    const handleLangChange = (e) => {
+      const code = e.detail || localStorage.getItem("kaamsetu_language") || "hi-IN";
+      setCurrentLang(code);
+    };
+    window.addEventListener("kaamsetu_language_changed", handleLangChange);
+    return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
+  }, []);
+
+  const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
 
   const handleWorkerClick = () => {
     navigate("/login/worker");
@@ -295,23 +324,23 @@ function ChooseRole() {
     <div className="entry-shell">
       <Header back="/" />
       <main className="entry-content">
-        <span className="step-label">Step 1 of 3</span>
-        <h1>How can we help today?</h1>
-        <p className="entry-intro">Choose the path that feels right for you.</p>
+        <span className="step-label">{t.chooseRoleStep}</span>
+        <h1>{t.chooseRoleHeading}</h1>
+        <p className="entry-intro">{t.chooseRoleSub}</p>
         <div className="role-grid">
           <button className="role-option worker" onClick={handleWorkerClick}>
             <span className="role-icon"><BriefcaseBusiness size={29} /></span>
             <div>
-              <h2>I’m looking for work</h2>
-              <p>Build your profile and find jobs that match your skills.</p>
+              <h2>{t.lookingForWorkTitle}</h2>
+              <p>{t.lookingForWorkSub}</p>
             </div>
             <ArrowRight size={21} />
           </button>
           <button className="role-option" onClick={handleEmployerClick}>
             <span className="role-icon employer"><Building2 size={29} /></span>
             <div>
-              <h2>I’m hiring</h2>
-              <p>Meet skilled, ready-to-work people near you.</p>
+              <h2>{t.hiringTitle}</h2>
+              <p>{t.hiringSub}</p>
             </div>
             <ArrowRight size={21} />
           </button>
@@ -851,6 +880,21 @@ function Auth({ initialMode = "login", initialRole }) {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
 
+  const [currentLang, setCurrentLang] = useState(
+    () => localStorage.getItem("kaamsetu_language") || "hi-IN"
+  );
+
+  useEffect(() => {
+    const handleLangChange = (e) => {
+      const code = e.detail || localStorage.getItem("kaamsetu_language") || "hi-IN";
+      setCurrentLang(code);
+    };
+    window.addEventListener("kaamsetu_language_changed", handleLangChange);
+    return () => window.removeEventListener("kaamsetu_language_changed", handleLangChange);
+  }, []);
+
+  const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
+
   const [mode, setMode] = useState(initialMode); // "login" | "signup"
   const [role, setRole] = useState(
     initialRole ||
@@ -867,8 +911,6 @@ function Auth({ initialMode = "login", initialRole }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-
-
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setError(null);
@@ -880,7 +922,7 @@ function Auth({ initialMode = "login", initialRole }) {
 
     if (mode === "login" && role === "worker") {
       if (!mobile.trim() || !password.trim()) {
-        setError("Please enter both mobile number and password");
+        setError(t.errorMissingFields);
         return;
       }
       setStoredUser({
@@ -966,14 +1008,14 @@ function Auth({ initialMode = "login", initialRole }) {
               onClick={() => { setMode("login"); setError(null); }}
               type="button"
             >
-              Sign In
+              {t.signInTab}
             </button>
             <button
               className={`mode-toggle-btn ${mode === "signup" ? "active" : ""}`}
               onClick={() => { setMode("signup"); setError(null); }}
               type="button"
             >
-              Create Account
+              {t.createAccountTab}
             </button>
           </div>
 
@@ -984,28 +1026,28 @@ function Auth({ initialMode = "login", initialRole }) {
               onClick={() => { setRole("worker"); setError(null); }}
               type="button"
             >
-              <BriefcaseBusiness size={16} /> Job Seeker (Worker)
+              <BriefcaseBusiness size={16} /> {t.jobSeekerRoleTab}
             </button>
             <button
               className={`role-tab ${role === "employer" ? "active" : ""}`}
               onClick={() => { setRole("employer"); setError(null); }}
               type="button"
             >
-              <Building2 size={16} /> Hiring (Employer)
+              <Building2 size={16} /> {t.employerRoleTab}
             </button>
           </div>
 
           <div className="auth-header">
             <h2>
               {mode === "login"
-                ? role === "worker" ? "Worker Login" : "Employer Sign In"
+                ? role === "worker" ? t.workerLoginTitle : t.employerLoginTitle
                 : role === "worker" ? "Join as a Job Seeker" : "Register as an Employer"}
             </h2>
             <p>
               {mode === "login"
                 ? role === "worker"
-                  ? "Sign in to see the jobs you applied for and track status."
-                  : "Sign in to review candidates and manage your job posts."
+                  ? t.workerLoginSub
+                  : t.employerLoginSub
                 : role === "worker"
                   ? "Create your personal Skill Passport and get discovered for fair work."
                   : "Post jobs and connect directly with skilled local talent."}
@@ -1039,12 +1081,12 @@ function Auth({ initialMode = "login", initialRole }) {
 
             {mode === "login" && role === "worker" ? (
               <div className="form-group">
-                <label htmlFor="mobile">Mobile Number</label>
+                <label htmlFor="mobile">{t.mobileLabel}</label>
                 <input
                   id="mobile"
                   type="tel"
                   required
-                  placeholder="Enter your mobile number"
+                  placeholder={t.mobilePlaceholder}
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
                 />
@@ -1064,12 +1106,12 @@ function Auth({ initialMode = "login", initialRole }) {
             )}
 
             <div className="form-group">
-              <label htmlFor="password">Password</label>
+              <label htmlFor="password">{t.passwordLabel}</label>
               <input
                 id="password"
                 type="password"
                 required
-                placeholder={mode === "login" && role === "worker" ? "Enter your password" : undefined}
+                placeholder={mode === "login" && role === "worker" ? t.passwordPlaceholder : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -1106,10 +1148,10 @@ function Auth({ initialMode = "login", initialRole }) {
 
             <button className="button primary full" type="submit" disabled={loading}>
               {loading
-                ? "Processing..."
+                ? t.processingBtn
                 : mode === "login"
                   ? role === "worker"
-                    ? "Login"
+                    ? t.loginBtn
                     : "Sign in as Employer"
                   : `Create ${role === "worker" ? "Worker" : "Employer"} Account`} <ArrowRight size={17} />
             </button>
@@ -1118,7 +1160,7 @@ function Auth({ initialMode = "login", initialRole }) {
           {/* Quick-Fill Chips for Testing Login */}
           {mode === "login" && (
             <div className="quick-fill-section">
-              <span className="quick-fill-label">⚡ One-Click Test Accounts</span>
+              <span className="quick-fill-label">{t.quickFillLabel}</span>
               {role === "worker" ? (
                 <div className="chip-group">
                   <button
@@ -1126,7 +1168,7 @@ function Auth({ initialMode = "login", initialRole }) {
                     className="quick-chip"
                     onClick={() => fillCredentials("9876543210", "worker")}
                   >
-                    <Check size={13} /> Raju Kumar (9876543210)
+                    <Check size={13} /> {t.quickChipWorker}
                   </button>
                 </div>
               ) : (
