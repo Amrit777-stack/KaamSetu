@@ -1,7 +1,7 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
-import { isDatabaseConfigured } from "./config/db.js";
+import { isDatabaseConfigured, testDatabaseConnection } from "./config/db.js";
 import { notFound } from "./middleware/notFound.js";
 
 import employerRouter from "./routes/employerRoutes.js";
@@ -20,11 +20,14 @@ const port = Number(process.env.PORT) || 4000;
 app.use(cors());
 app.use(express.json());
 
-app.get("/api/health", (_request, response) => {
+app.get("/api/health", async (_request, response) => {
+  const database = await testDatabaseConnection();
+
   response.json({
     status: "ok",
     service: "KaamSetu API",
     databaseConfigured: isDatabaseConfigured(),
+    database,
   });
 });
 
