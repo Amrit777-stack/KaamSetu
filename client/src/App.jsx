@@ -31,6 +31,7 @@ import {
   prefetchQuestionTranslations,
   translateQuestion,
   speakText,
+  getFallbackQuestion,
 } from "./services/questionSpeech.js";
 import { submitVoiceResponse } from "./services/voiceResponse.js";
 import "./App.css";
@@ -155,12 +156,7 @@ function Landing() {
               <button
                 className="button primary"
                 onClick={() => {
-                  const user = getStoredUser();
-                  if (user && user.role === "worker") {
-                    navigate("/language");
-                  } else {
-                    navigate("/signup?role=worker");
-                  }
+                  navigate("/login/worker");
                 }}
               >
                 Find work <ArrowRight size={18} />
@@ -237,11 +233,7 @@ function ChooseRole() {
   const currentUser = getStoredUser();
 
   const handleWorkerClick = () => {
-    if (currentUser && currentUser.role === "worker") {
-      navigate("/language");
-    } else {
-      navigate("/signup?role=worker");
-    }
+    navigate("/login/worker");
   };
 
   const handleEmployerClick = () => {
@@ -398,20 +390,22 @@ function Onboarding() {
     if (mode !== "voice") return undefined;
 
     let ignoreResult = false;
-    setTranslatedQuestion("");
+    const englishText = questions[step][1];
+    const initialText =
+      getFallbackQuestion(englishText, preferredLanguageCode) ||
+      questions[step][0];
+
+    setTranslatedQuestion(initialText);
     setTranslationError("");
 
-    translateQuestion(questions[step][1], preferredLanguageCode)
+    translateQuestion(englishText, preferredLanguageCode)
       .then((translation) => {
-        if (!ignoreResult) setTranslatedQuestion(translation);
+        if (!ignoreResult && translation) {
+          setTranslatedQuestion(translation);
+        }
       })
       .catch((error) => {
-        console.error("Question translation failed:", error);
-        if (!ignoreResult) {
-          setTranslationError(
-            "Translation could not be completed. Please try the next question."
-          );
-        }
+        console.warn("Question translation failed, using fallback:", error);
       });
 
     return () => {
@@ -567,14 +561,12 @@ function Onboarding() {
 
           <p className="hindi-question">
             {mode === "voice"
-              ? translatedQuestion || "Preparing your question..."
-              : questions[step][0]}
+              ? translatedQuestion || getFallbackQuestion(questions[step][1], preferredLanguageCode) || questions[step][0]
+              : getFallbackQuestion(questions[step][1], preferredLanguageCode) || questions[step][0]}
           </p>
 
           <p className="translation">
-            {mode === "voice"
-              ? questions[step][1]
-              : questions[step][1]}
+            {questions[step][1]}
           </p>
         </section>
 
@@ -688,25 +680,28 @@ function Welcome() {
 /**
  * AUTH COMPONENT: Unified Sign In & Sign Up with Role Isolation
  */
-function Auth({ initialMode = "login" }) {
+function Auth({ initialMode = "login", initialRole }) {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
 
   const [mode, setMode] = useState(initialMode); // "login" | "signup"
-  const [role, setRole] = useState(searchParams.get("role") || "worker"); // "worker" | "employer"
+  const [role, setRole] = useState(
+    initialRole ||
+    (location.pathname === "/login/employer" ? "employer" : null) ||
+    searchParams.get("role") ||
+    "worker"
+  ); // "worker" | "employer"
   const [name, setName] = useState(searchParams.get("name") || "");
+  const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("password123");
-  const [confirmPassword, setConfirmPassword] = useState("password123");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setMode(initialMode);
-    setError(null);
-  }, [initialMode]);
+
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -714,6 +709,23 @@ function Auth({ initialMode = "login" }) {
 
     if (mode === "signup" && password !== confirmPassword) {
       setError("Passwords do not match");
+      return;
+    }
+
+    if (mode === "login" && role === "worker") {
+      if (!mobile.trim() || !password.trim()) {
+        setError("Please enter both mobile number and password");
+        return;
+      }
+      setStoredUser({
+        id: "demo-worker",
+        name: "Worker",
+        mobile: mobile.trim(),
+        role: "worker",
+        occupation: "Welder",
+        location: "Pune",
+      });
+      navigate("/language");
       return;
     }
 
@@ -727,7 +739,7 @@ function Auth({ initialMode = "login" }) {
         });
         setStoredUser(res.user);
         if (res.user.role === "worker") {
-          navigate("/worker/dashboard");
+          navigate("/language");
         } else {
           navigate("/employer");
         }
@@ -764,9 +776,14 @@ function Auth({ initialMode = "login" }) {
     }
   };
 
-  const fillCredentials = (fillEmail, fillRole) => {
-    setEmail(fillEmail);
-    setPassword("password123");
+  const fillCredentials = (fillVal, fillRole) => {
+    if (fillRole === "worker") {
+      setMobile(fillVal);
+      setPassword("abc123");
+    } else {
+      setEmail(fillVal);
+      setPassword("password123");
+    }
     setError(null);
     if (fillRole) setRole(fillRole);
   };
@@ -815,7 +832,7 @@ function Auth({ initialMode = "login" }) {
           <div className="auth-header">
             <h2>
               {mode === "login"
-                ? role === "worker" ? "Worker Sign In" : "Employer Sign In"
+                ? role === "worker" ? "Worker Login" : "Employer Sign In"
                 : role === "worker" ? "Join as a Job Seeker" : "Register as an Employer"}
             </h2>
             <p>
@@ -854,17 +871,31 @@ function Auth({ initialMode = "login" }) {
               </div>
             )}
 
-            <div className="form-group">
-              <label htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                type="email"
-                required
-                placeholder={role === "worker" ? "your.email@example.com" : "contact@company.com"}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+            {mode === "login" && role === "worker" ? (
+              <div className="form-group">
+                <label htmlFor="mobile">Mobile Number</label>
+                <input
+                  id="mobile"
+                  type="tel"
+                  required
+                  placeholder="Enter your mobile number"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="form-group">
+                <label htmlFor="email">Email Address</label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder={role === "worker" ? "your.email@example.com" : "contact@company.com"}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="form-group">
               <label htmlFor="password">Password</label>
@@ -872,6 +903,7 @@ function Auth({ initialMode = "login" }) {
                 id="password"
                 type="password"
                 required
+                placeholder={mode === "login" && role === "worker" ? "Enter your password" : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -910,7 +942,9 @@ function Auth({ initialMode = "login" }) {
               {loading
                 ? "Processing..."
                 : mode === "login"
-                  ? `Sign in as ${role === "worker" ? "Job Seeker" : "Employer"}`
+                  ? role === "worker"
+                    ? "Login"
+                    : "Sign in as Employer"
                   : `Create ${role === "worker" ? "Worker" : "Employer"} Account`} <ArrowRight size={17} />
             </button>
           </form>
@@ -924,17 +958,9 @@ function Auth({ initialMode = "login" }) {
                   <button
                     type="button"
                     className="quick-chip"
-                    onClick={() => fillCredentials("raju@example.test", "worker")}
+                    onClick={() => fillCredentials("9876543210", "worker")}
                   >
-                    <Check size={13} /> Raju Kumar (Valid Worker)
-                  </button>
-                  <button
-                    type="button"
-                    className="quick-chip warning"
-                    onClick={() => fillCredentials("amit@pragati.example.test", "worker")}
-                    title="Employer email in worker login"
-                  >
-                    <X size={13} /> Amit Shah (Employer &rarr; Fails)
+                    <Check size={13} /> Raju Kumar (9876543210)
                   </button>
                 </div>
               ) : (
@@ -1537,10 +1563,10 @@ function App() {
   if (path === "/onboarding") return <Onboarding />;
   if (path === "/employer") return <Employer />;
   if (path === "/welcome") return <Welcome />;
-  if (path === "/signup") return <Auth initialMode="signup" />;
-  if (path === "/login/worker") return <Auth initialMode="login" />;
-  if (path === "/login/employer") return <Auth initialMode="login" />;
-  if (path === "/login") return <Auth initialMode="login" />;
+  if (path === "/signup") return <Auth key="signup" initialMode="signup" />;
+  if (path === "/login/worker") return <Auth key="login-worker" initialMode="login" initialRole="worker" />;
+  if (path === "/login/employer") return <Auth key="login-employer" initialMode="login" initialRole="employer" />;
+  if (path === "/login") return <Auth key="login" initialMode="login" initialRole="worker" />;
   if (path === "/worker/dashboard") return <WorkerDashboard />;
   return <Landing />;
 }
