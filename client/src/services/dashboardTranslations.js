@@ -51,7 +51,7 @@ export const dashboardTranslations = {
     processingBtn: "Processing...",
     quickFillLabel: "⚡ One-Click Test Accounts",
     quickChipWorker: "Raju Kumar (ID: 1)",
-    quickChipEmployer: "Shakti Industries (ID: 501)",
+    quickChipEmployer: "Amit Shah (ID: 5)",
     errorMissingFieldsWorker: "Please enter both Email and User ID",
     errorMissingFieldsEmployer: "Please enter both Email and Password",
 
@@ -62,6 +62,8 @@ export const dashboardTranslations = {
     withdrawBtn: "Withdraw Application",
     voiceApplyBtn: "Voice Apply",
     quickApplyBtn: "Quick Apply",
+    openOpportunities: "Open Opportunities",
+    browseOpportunities: "Browse open vacancies below to apply directly, or speak naturally with our Voice Assistant.", voiceSearchBtn: "Find Jobs by Voice", voiceJobSearch: "Voice Job Search", cancelClose: "Cancel and close", listenQuestion: "Listen to question aloud", listeningVoice: "Listening... Tap to stop speaking", processingVoice: "Processing your voice...", tapToSpeak: "Tap mic and speak your answer naturally", heard: "Heard:", fillManually: "Or fill details manually:", searching: "Searching...", next: "Next", noOpenJobs: "No open jobs available currently. Check back soon!", openings: "Openings", minimumExperience: "yrs minimum experience", applied: "Applied", applying: "Applying...",
 
     // Post tab
     voiceBadge: "Voice-Powered Opportunity",
@@ -182,7 +184,7 @@ export const dashboardTranslations = {
     processingBtn: "प्रक्रिया जारी है...",
     quickFillLabel: "⚡ एक-क्लिक टेस्ट खाता",
     quickChipWorker: "राजू कुमार (ID: 1)",
-    quickChipEmployer: "शक्ति इंडस्ट्रीज (ID: 501)",
+    quickChipEmployer: "Amit Shah (ID: 5)",
     errorMissingFieldsWorker: "कृपया ईमेल और यूज़र आईडी दोनों दर्ज करें",
     errorMissingFieldsEmployer: "कृपया ईमेल और पासवर्ड दोनों दर्ज करें",
 
@@ -193,6 +195,8 @@ export const dashboardTranslations = {
     withdrawBtn: "आवेदन वापस लें",
     voiceApplyBtn: "वॉइस आवेदन",
     quickApplyBtn: "तुरंत आवेदन करें",
+    openOpportunities: "खुली नौकरियाँ",
+    browseOpportunities: "नीचे खुली नौकरियाँ देखें, सीधे आवेदन करें या हमारे वॉइस असिस्टेंट से बात करें।", voiceSearchBtn: "आवाज़ से नौकरी खोजें", voiceJobSearch: "वॉइस नौकरी खोज", cancelClose: "रद्द करें और बंद करें", listenQuestion: "सवाल सुनें", listeningVoice: "सुन रहे हैं... बोलना बंद करने के लिए टैप करें", processingVoice: "आपकी आवाज़ प्रोसेस हो रही है...", tapToSpeak: "माइक टैप करें और स्वाभाविक रूप से बोलें", heard: "सुना गया:", fillManually: "या विवरण मैन्युअल रूप से भरें:", searching: "खोज रहे हैं...", next: "आगे", noOpenJobs: "अभी कोई खुली नौकरी उपलब्ध नहीं है। बाद में देखें!", openings: "रिक्तियाँ", minimumExperience: "वर्ष न्यूनतम अनुभव", applied: "आवेदन किया", applying: "आवेदन हो रहा है...",
 
     // Post tab
     voiceBadge: "वॉइस-आधारित अवसर",
@@ -314,7 +318,7 @@ export const dashboardTranslations = {
     processingBtn: "செயலாக்குகிறது...",
     quickFillLabel: "⚡ ஒரு கிளிக் சோதனை கணக்கு",
     quickChipWorker: "ராஜு குமார் (ID: 1)",
-    quickChipEmployer: "சக்தி இண்டஸ்ட்ரீஸ் (ID: 501)",
+    quickChipEmployer: "Amit Shah (ID: 5)",
     errorMissingFieldsWorker: "மின்னஞ்சல் மற்றும் பயனர் ஐடி இரண்டையும் உள்ளிடவும்",
     errorMissingFieldsEmployer: "மின்னஞ்சல் மற்றும் கடவுச்சொல் இரண்டையும் உள்ளிடவும்",
 
@@ -325,6 +329,8 @@ export const dashboardTranslations = {
     withdrawBtn: "விண்ணப்பத்தை திரும்பப் பெறவும்",
     voiceApplyBtn: "குரல் வழி விண்ணப்பிக்கவும்",
     quickApplyBtn: "உடனடி விண்ணப்பம்",
+    openOpportunities: "திறந்த வேலை வாய்ப்புகள்",
+    browseOpportunities: "கீழே உள்ள காலியிடங்களை நேரடியாக விண்ணப்பிக்கவும் அல்லது குரல் உதவியாளரிடம் பேசவும்.", voiceSearchBtn: "குரல் மூலம் வேலை தேடுங்கள்", voiceJobSearch: "குரல் வேலை தேடல்", cancelClose: "ரத்துசெய்து மூடவும்", listenQuestion: "கேள்வியைக் கேளுங்கள்", listeningVoice: "கேட்கிறது... பேசுவதை நிறுத்த தட்டவும்", processingVoice: "உங்கள் குரல் செயலாக்கப்படுகிறது...", tapToSpeak: "மைக் தட்டி இயல்பாகப் பேசுங்கள்", heard: "கேட்டது:", fillManually: "அல்லது விவரங்களை கைமுறையாக நிரப்பவும்:", searching: "தேடுகிறது...", next: "அடுத்து", noOpenJobs: "தற்போது திறந்த வேலைகள் இல்லை. பின்னர் பார்க்கவும்!", openings: "காலியிடங்கள்", minimumExperience: "ஆண்டுகள் குறைந்தபட்ச அனுபவம்", applied: "விண்ணப்பித்தது", applying: "விண்ணப்பிக்கிறது...",
 
     // Post tab
     voiceBadge: "குரல் வழி வாய்ப்பு பதிவு",
@@ -446,7 +452,7 @@ export const dashboardTranslations = {
     processingBtn: "ప్రాసెస్ అవుతోంది...",
     quickFillLabel: "⚡ ఒకే క్లిక్‌తో టెస్ట్ ఖాతా",
     quickChipWorker: "రాజు కుమార్ (ID: 1)",
-    quickChipEmployer: "శక్తి ఇండస్ట్రీస్ (ID: 501)",
+    quickChipEmployer: "Amit Shah (ID: 5)",
     errorMissingFieldsWorker: "దయచేసి ఈమెయిల్ మరియు యూజర్ ఐడి రెండింటినీ నమోదు చేయండి",
     errorMissingFieldsEmployer: "దయచేసి ఈమెయిల్ మరియు పాస్‌వర్డ్ రెండింటినీ నమోదు చేయండి",
 
@@ -457,6 +463,8 @@ export const dashboardTranslations = {
     withdrawBtn: "దరఖాస్తును ఉపసంహరించుకోండి",
     voiceApplyBtn: "వాయిస్ దరఖాస్తు",
     quickApplyBtn: "వెంటనే దరఖాస్తు చేయండి",
+    openOpportunities: "అందుబాటులో ఉన్న ఉద్యోగాలు",
+    browseOpportunities: "క్రింద ఉన్న ఖాళీలకు నేరుగా దరఖాస్తు చేయండి లేదా మా వాయిస్ అసిస్టెంట్‌తో మాట్లాడండి.", voiceSearchBtn: "వాయిస్‌తో ఉద్యోగాలు వెతకండి", voiceJobSearch: "వాయిస్ ఉద్యోగ శోధన", cancelClose: "రద్దు చేసి మూసివేయండి", listenQuestion: "ప్రశ్న వినండి", listeningVoice: "వింటోంది... మాట్లాడటం ఆపడానికి నొక్కండి", processingVoice: "మీ వాయిస్ ప్రాసెస్ అవుతోంది...", tapToSpeak: "మైక్ నొక్కి సహజంగా మాట్లాడండి", heard: "విన్నది:", fillManually: "లేదా వివరాలను మాన్యువల్‌గా నింపండి:", searching: "వెతుకుతోంది...", next: "తదుపరి", noOpenJobs: "ప్రస్తుతం ఖాళీ ఉద్యోగాలు లేవు. తరువాత చూడండి!", openings: "ఖాళీలు", minimumExperience: "సంవత్సరాల కనీస అనుభవం", applied: "దరఖాస్తు చేశారు", applying: "దరఖాస్తు అవుతోంది...",
 
     // Post tab
     voiceBadge: "వాయిస్ ఆధారిత అవకాశం",
@@ -578,7 +586,7 @@ export const dashboardTranslations = {
     processingBtn: "ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ...",
     quickFillLabel: "⚡ ಒಂದೇ ಕ್ಲಿಕ್ ಪರೀಕ್ಷಾ ಖಾತೆ",
     quickChipWorker: "ರಾಜು ಕುಮಾರ್ (ID: 1)",
-    quickChipEmployer: "ಶಕ್ತಿ ಇಂಡಸ್ಟ್ರೀಸ್ (ID: 501)",
+    quickChipEmployer: "Amit Shah (ID: 5)",
     errorMissingFieldsWorker: "ದಯವಿಟ್ಟು ಇಮೇಲ್ ಮತ್ತು ಬಳಕೆದಾರರ ಐಡಿ ಎರಡನ್ನೂ ನಮೂದಿಸಿ",
     errorMissingFieldsEmployer: "ದಯವಿಟ್ಟು ಇಮೇಲ್ ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಎರಡನ್ನೂ ನಮೂದಿಸಿ",
 
@@ -589,6 +597,8 @@ export const dashboardTranslations = {
     withdrawBtn: "ಅರ್ಜಿಯನ್ನು ಹಿಂಪಡೆಯಿರಿ",
     voiceApplyBtn: "ಧ್ವನಿ ಮೂಲಕ ಅರ್ಜಿ",
     quickApplyBtn: "ತ್ವರಿತ ಅರ್ಜಿ",
+    openOpportunities: "ಲಭ್ಯವಿರುವ ಉದ್ಯೋಗಗಳು",
+    browseOpportunities: "ಕೆಳಗಿನ ಖಾಲಿ ಹುದ್ದೆಗಳಿಗೆ ನೇರವಾಗಿ ಅರ್ಜಿ ಸಲ್ಲಿಸಿ ಅಥವಾ ನಮ್ಮ ಧ್ವನಿ ಸಹಾಯಕದೊಂದಿಗೆ ಮಾತನಾಡಿ.", voiceSearchBtn: "ಧ್ವನಿಯ ಮೂಲಕ ಕೆಲಸ ಹುಡುಕಿ", voiceJobSearch: "ಧ್ವನಿ ಉದ್ಯೋಗ ಹುಡುಕಾಟ", cancelClose: "ರದ್ದು ಮಾಡಿ ಮುಚ್ಚಿ", listenQuestion: "ಪ್ರಶ್ನೆ ಆಲಿಸಿ", listeningVoice: "ಆಲಿಸುತ್ತಿದೆ... ಮಾತನಾಡುವುದನ್ನು ನಿಲ್ಲಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ", processingVoice: "ನಿಮ್ಮ ಧ್ವನಿ ಪ್ರಕ್ರಿಯೆಗೊಳ್ಳುತ್ತಿದೆ...", tapToSpeak: "ಮೈಕ್ ಟ್ಯಾಪ್ ಮಾಡಿ ಸಹಜವಾಗಿ ಮಾತನಾಡಿ", heard: "ಕೇಳಿದ್ದು:", fillManually: "ಅಥವಾ ವಿವರಗಳನ್ನು ಕೈಯಾರೆ ಭರ್ತಿ ಮಾಡಿ:", searching: "ಹುಡುಕುತ್ತಿದೆ...", next: "ಮುಂದೆ", noOpenJobs: "ಪ್ರಸ್ತುತ ಖಾಲಿ ಉದ್ಯೋಗಗಳಿಲ್ಲ. ನಂತರ ಪರಿಶೀಲಿಸಿ!", openings: "ಖಾಲಿ ಹುದ್ದೆಗಳು", minimumExperience: "ವರ್ಷಗಳ ಕನಿಷ್ಠ ಅನುಭವ", applied: "ಅರ್ಜಿ ಸಲ್ಲಿಸಲಾಗಿದೆ", applying: "ಅರ್ಜಿ ಸಲ್ಲಿಸಲಾಗುತ್ತಿದೆ...",
 
     // Post tab
     voiceBadge: "ಧ್ವನಿ-ಚಾಲಿತ ಅವಕಾಶ",
@@ -710,7 +720,7 @@ export const dashboardTranslations = {
     processingBtn: "प्रक्रिया सुरू आहे...",
     quickFillLabel: "⚡ एक-क्लिक चाचणी खाते",
     quickChipWorker: "राजू कुमार (ID: 1)",
-    quickChipEmployer: "शक्ती इंडस्ट्रीज (ID: 501)",
+    quickChipEmployer: "Amit Shah (ID: 5)",
     errorMissingFieldsWorker: "कृपया ईमेल आणि वापरकर्ता आयडी दोन्ही प्रविष्ट करा",
     errorMissingFieldsEmployer: "कृपया ईमेल आणि पासवर्ड दोन्ही प्रविष्ट करा",
 
@@ -721,6 +731,8 @@ export const dashboardTranslations = {
     withdrawBtn: "अर्ज मागे घ्या",
     voiceApplyBtn: "व्हॉइस अर्ज",
     quickApplyBtn: "त्वरित अर्ज करा",
+    openOpportunities: "उपलब्ध नोकऱ्या",
+    browseOpportunities: "खालील रिक्त जागा थेट अर्ज करण्यासाठी पहा किंवा आमच्या व्हॉइस असिस्टंटशी बोला.", voiceSearchBtn: "आवाजाने नोकऱ्या शोधा", voiceJobSearch: "व्हॉइस नोकरी शोध", cancelClose: "रद्द करून बंद करा", listenQuestion: "प्रश्न ऐका", listeningVoice: "ऐकत आहे... बोलणे थांबवण्यासाठी टॅप करा", processingVoice: "तुमचा आवाज प्रक्रिया होत आहे...", tapToSpeak: "माइक टॅप करा आणि नैसर्गिकपणे बोला", heard: "ऐकले:", fillManually: "किंवा तपशील स्वतः भरा:", searching: "शोधत आहे...", next: "पुढे", noOpenJobs: "सध्या कोणत्याही खुल्या नोकऱ्या उपलब्ध नाहीत. नंतर तपासा!", openings: "रिक्त जागा", minimumExperience: "वर्षे किमान अनुभव", applied: "अर्ज केला", applying: "अर्ज करत आहे...",
 
     // Post tab
     voiceBadge: "व्हॉइस-आधारित संधी",

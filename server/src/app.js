@@ -1,7 +1,7 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
-import { isDatabaseConfigured, testDatabaseConnection } from "./config/db.js";
+import { ensureUserOccupationColumn, isDatabaseConfigured, testDatabaseConnection } from "./config/db.js";
 import { notFound } from "./middleware/notFound.js";
 
 import employerRouter from "./routes/employerRoutes.js";
@@ -13,6 +13,7 @@ import authRouter from "./routes/authRoutes.js";
 import ttsRouter from "./routes/tts.js";
 import translateRouter from "./routes/translate.js";
 import sttRouter from "./routes/stt.js";
+import voiceJobSearchRouter from "./routes/voiceJobSearchRoutes.js";
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -40,13 +41,21 @@ app.use("/api/applications", applicationRouter);
 app.use("/api/tts", ttsRouter);
 app.use("/api/translate", translateRouter);
 app.use("/api/stt", sttRouter);
+app.use("/api/voice-job-search", voiceJobSearchRouter);
 
 app.use(notFound);
 
 export default app;
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
-    console.log(`KaamSetu API listening on http://localhost:${port}`);
-  });
+  ensureUserOccupationColumn()
+    .then(() => {
+      app.listen(port, () => {
+        console.log(`KaamSetu API listening on http://localhost:${port}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Unable to prepare the database schema:", error.message);
+      process.exit(1);
+    });
 }

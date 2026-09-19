@@ -2,8 +2,10 @@ CREATE TABLE users (
   id BIGSERIAL PRIMARY KEY,
   name VARCHAR(120) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
+  -- Used for employer authentication; workers use their issued user ID.
   password_hash TEXT NOT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('worker', 'employer')),
+  occupation VARCHAR(120),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
