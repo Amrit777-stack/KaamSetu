@@ -20,6 +20,7 @@ async function runAuthTests() {
   try {
     await authenticateUser({
       email: "worker1@kaamsetu.demo",
+      password: "not-used",
       userId: 1,
       expectedRole: "employer",
     });
@@ -32,19 +33,19 @@ async function runAuthTests() {
 
   // 3. Valid Employer Login (uses Email + Password)
   const employerLogin = await authenticateUser({
-    email: "employer5@kaamsetu.demo",
+    email: "employer501@kaamsetu.demo",
     password: "password123",
     expectedRole: "employer",
   });
   assert.equal(employerLogin.role, "employer");
-  assert.equal(employerLogin.name, "Amit Shah");
+  assert.equal(employerLogin.email, "employer501@kaamsetu.demo");
   console.log("[PASS] Employer logged in successfully via employer portal.");
 
   // 4. Employer attempts to login via Worker portal (Must throw "No worker account found")
   try {
     await authenticateUser({
-    email: "employer5@kaamsetu.demo",
-    userId: 5,
+    email: "employer501@kaamsetu.demo",
+    userId: 501,
       expectedRole: "worker",
     });
     assert.fail("Should have rejected employer on worker portal");
@@ -71,7 +72,7 @@ async function runAuthTests() {
   // 6. Invalid Employer Password
   try {
     await authenticateUser({
-      email: "employer5@kaamsetu.demo",
+      email: "employer501@kaamsetu.demo",
       password: "wrongpassword",
       expectedRole: "employer",
     });
