@@ -537,12 +537,18 @@ function Onboarding() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const chunks = [];
+      // Sarvam's synchronous STT endpoint accepts recordings up to 30 seconds.
+      // Stop slightly earlier so encoding and upload overhead cannot exceed its limit.
+      const maximumRecordingTimer = window.setTimeout(() => {
+        if (mediaRecorder.state === "recording") mediaRecorder.stop();
+      }, 29_000);
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) chunks.push(event.data);
       };
 
       mediaRecorder.onstop = async () => {
+        window.clearTimeout(maximumRecordingTimer);
         stream.getTracks().forEach((track) => track.stop());
         setListening(false);
         setRecorder(null);
@@ -553,12 +559,16 @@ function Onboarding() {
             type: mediaRecorder.mimeType || "audio/webm",
           });
 
+          if (audio.size === 0) {
+            throw new Error("No audio was captured. Check your microphone permission and try again.");
+          }
+
           const record = await submitVoiceResponse(
             audio,
             ["name", "occupation", "experienceYears"][step]
           );
 
-          const recognized = record.englishTranscript || record.transcript || "";
+          const recognized = record.transcript || record.englishTranscript || "";
           setTranscript(recognized);
           setAnswer(recognized);
 

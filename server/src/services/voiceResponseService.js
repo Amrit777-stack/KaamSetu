@@ -29,12 +29,15 @@ async function readResponses() {
   }
 }
 
-export async function saveVoiceResponse({ field, transcript, languageCode, languageProbability }) {
+export async function saveVoiceResponse({ field, transcript, englishTranscript, languageCode, languageProbability }) {
   const record = {
     id: randomUUID(),
     field,
-    value: extractValue(field, transcript),
-    englishTranscript: transcript.trim(),
+    // Use English for structured extraction (for example, "three years" -> 3).
+    value: extractValue(field, englishTranscript),
+    // Keep the recognised text exactly in the language/script returned by STT.
+    transcript: transcript.trim(),
+    englishTranscript: englishTranscript.trim(),
     detectedLanguageCode: languageCode || null,
     languageProbability: languageProbability ?? null,
     createdAt: new Date().toISOString(),
