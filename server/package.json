@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/app.js",
-    "start": "node src/app.js"
+    "start": "node src/app.js",
+    "test": "node test-hiring.js && node test-api.js && node test-auth.js && node test-signup-flow.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^18.0.0",
     "express": "^5.2.1",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "sarvamai": "^1.1.10"
   }
 }
