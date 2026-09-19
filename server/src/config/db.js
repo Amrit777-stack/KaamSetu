@@ -16,6 +16,12 @@ export const pool = connectionString
 
 export const isDatabaseConfigured = () => Boolean(pool);
 
+// Keeps existing databases compatible with the users-table occupation field.
+export async function ensureUserOccupationColumn() {
+  if (!pool) return;
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation VARCHAR(120)");
+}
+
 export async function testDatabaseConnection() {
   if (!pool) {
     return {
