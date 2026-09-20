@@ -114,6 +114,8 @@ export const dashboardTranslations = {
     employerJobType: "Job Type",
     verifiedEmployerBadge: "Verified Employer",
     requiredSkillsLabel: "Required Skills",
+    showingJobsIn: "Showing jobs matching:",
+    clearFilterShowNearby: "Clear Filter · Show Nearby Jobs",
     apps: [
       {
         jobTitle: "MIG Welder",
@@ -255,6 +257,8 @@ export const dashboardTranslations = {
     employerJobType: "रोजगार प्रकार",
     verifiedEmployerBadge: "सत्यापित नियोक्ता",
     requiredSkillsLabel: "आवश्यक कौशल",
+    showingJobsIn: "इस खोज के अनुसार नौकरियां:",
+    clearFilterShowNearby: "फ़िल्टर हटाएं · पास की नौकरियां देखें",
     apps: [
       {
         jobTitle: "एमआईजी वेल्डर (MIG Welder)",
@@ -397,6 +401,8 @@ export const dashboardTranslations = {
     employerJobType: "வேலை வகை",
     verifiedEmployerBadge: "சரிபார்க்கப்பட்ட முதலாளி",
     requiredSkillsLabel: "தேவையான திறன்கள்",
+    showingJobsIn: "பொருந்திய வேலைகள்:",
+    clearFilterShowNearby: "வடிகட்டியை நீக்கு · அருகிலுள்ள வேலைகளைக் காட்டு",
     apps: [
       {
         jobTitle: "MIG வெல்டர் (MIG Welder)",
@@ -539,6 +545,8 @@ export const dashboardTranslations = {
     employerJobType: "ఉద్యోగ రకం",
     verifiedEmployerBadge: "ధృవీకరించబడిన యజమాని",
     requiredSkillsLabel: "అవసరమైన నైపుణ్యాలు",
+    showingJobsIn: "ఈ శోధనకు సరిపోలిన ఉద్యోగాలు:",
+    clearFilterShowNearby: "ఫిల్టర్ తొలగించు · సమీప ఉద్యోగాలు చూపించు",
     apps: [
       {
         jobTitle: "MIG వెల్డర్ (MIG Welder)",
@@ -681,6 +689,8 @@ export const dashboardTranslations = {
     employerJobType: "ಉದ್ಯೋಗ ಪ್ರಕಾರ",
     verifiedEmployerBadge: "ದೃಢೀಕರಿಸಿದ ಮಾಲೀಕರು",
     requiredSkillsLabel: "ಅಗತ್ಯವಿರುವ ಕೌಶಲ್ಯಗಳು",
+    showingJobsIn: "ಹೊಂದಾಣಿಕೆಯ ಉದ್ಯೋಗಗಳು:",
+    clearFilterShowNearby: "ಫಿಲ್ಟರ್ ತೆರವುಗೊಳಿಸಿ · ಹತ್ತಿರದ ಉದ್ಯೋಗಗಳನ್ನು ತೋರಿಸಿ",
     apps: [
       {
         jobTitle: "MIG ವೆಲ್ಡರ್ (MIG Welder)",
@@ -823,6 +833,8 @@ export const dashboardTranslations = {
     employerJobType: "नोकरीचा प्रकार",
     verifiedEmployerBadge: "पडताळणीकृत नियोक्ता",
     requiredSkillsLabel: "आवश्यक कौशल्ये",
+    showingJobsIn: "या शोधानुसार नोकऱ्या:",
+    clearFilterShowNearby: "फिल्टर काढा · जवळच्या नोकऱ्या पहा",
     apps: [
       {
         jobTitle: "एमआयजी वेल्डर (MIG Welder)",

@@ -1,4 +1,5 @@
 import { pool, isDatabaseConfigured } from "../config/db.js";
+import { resolveCity, getCityCoordinates } from "./cityCoordinates.js";
 
 // In-memory fallback profiles
 const fallbackWorkerProfiles = new Map();
@@ -144,21 +145,51 @@ export async function updateWorkerManualLocation(userId, location) {
     error.status = 400;
     throw error;
   }
+
+  const canonicalCity = resolveCity(city) || city;
+  const coords = getCityCoordinates(canonicalCity);
+  const lat = coords ? coords.latitude : null;
+  const lng = coords ? coords.longitude : null;
+
   if (isDatabaseConfigured()) {
-    const { rows } = await pool.query(
-      "UPDATE worker_profiles SET location = $1, updated_at = NOW() WHERE user_id = $2 RETURNING location",
-      [city, Number(userId)]
-    );
+    let rows;
+    if (lat !== null && lng !== null) {
+      const res = await pool.query(
+        "UPDATE worker_profiles SET location = $1, latitude = $2, longitude = $3, updated_at = NOW() WHERE user_id = $4 RETURNING location, latitude, longitude",
+        [canonicalCity, lat, lng, Number(userId)]
+      );
+      rows = res.rows;
+    } else {
+      const res = await pool.query(
+        "UPDATE worker_profiles SET location = $1, updated_at = NOW() WHERE user_id = $2 RETURNING location, latitude, longitude",
+        [canonicalCity, Number(userId)]
+      );
+      rows = res.rows;
+    }
     if (!rows.length) {
       const error = new Error("Worker profile not found");
       error.status = 404;
       throw error;
     }
-    return { location: rows[0].location };
+    return {
+      location: rows[0].location,
+      latitude: rows[0].latitude != null ? Number(rows[0].latitude) : null,
+      longitude: rows[0].longitude != null ? Number(rows[0].longitude) : null,
+    };
   }
+
   const existing = await getWorkerProfile(userId);
-  fallbackWorkerProfiles.set(Number(userId), { ...existing, location: city });
-  return { location: city };
+  const updated = {
+    ...existing,
+    location: canonicalCity,
+    ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {}),
+  };
+  fallbackWorkerProfiles.set(Number(userId), updated);
+  return {
+    location: canonicalCity,
+    latitude: updated.latitude ?? null,
+    longitude: updated.longitude ?? null,
+  };
 }
 
 /**

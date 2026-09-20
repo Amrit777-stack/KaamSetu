@@ -1,8 +1,4 @@
-import { apiRequest } from "./api.js";
-
-const GEO_OPTIONS = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
-
-export const KNOWN_CITY_COORDINATES = {
+export const CITY_COORDINATES = {
   pune: { latitude: 18.5204, longitude: 73.8567 },
   mumbai: { latitude: 19.0760, longitude: 72.8777 },
   chennai: { latitude: 13.0827, longitude: 80.2707 },
@@ -109,19 +105,22 @@ export function resolveCity(text) {
   const raw = text.trim();
   const lower = raw.toLowerCase();
 
+  // 1. Direct match in aliases
   for (const [alias, canonical] of Object.entries(CITY_ALIASES)) {
     if (lower.includes(alias.toLowerCase())) {
       return canonical[0].toUpperCase() + canonical.slice(1);
     }
   }
 
-  for (const cityKey of Object.keys(KNOWN_CITY_COORDINATES)) {
+  // 2. Direct match in CITY_COORDINATES keys
+  for (const cityKey of Object.keys(CITY_COORDINATES)) {
     const regex = new RegExp(`\\b${cityKey}\\b`, "i");
     if (regex.test(lower)) {
       return cityKey.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
     }
   }
 
+  // 3. Strip common noise words: "in Mumbai", "Mumbai city", "चेन्नई में", "area"
   const cleaned = raw
     .replace(/^(in|at|near|around|शहर|में|इलाके में|area|city)\s+/i, "")
     .replace(/\s+(in|at|near|around|शहर|में|इलाके में|area|city|mein|me)$/i, "")
@@ -129,9 +128,10 @@ export function resolveCity(text) {
 
   if (cleaned.length >= 2) {
     const cleanedLower = cleaned.toLowerCase();
-    if (KNOWN_CITY_COORDINATES[cleanedLower]) {
+    if (CITY_COORDINATES[cleanedLower]) {
       return cleanedLower.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
     }
+    // Also check aliases on cleaned string
     for (const [alias, canonical] of Object.entries(CITY_ALIASES)) {
       if (cleanedLower === alias.toLowerCase() || cleanedLower.includes(alias.toLowerCase())) {
         return canonical[0].toUpperCase() + canonical.slice(1);
@@ -146,58 +146,6 @@ export function getCityCoordinates(cityName) {
   if (!cityName || typeof cityName !== "string") return null;
   const canonical = resolveCity(cityName) || cityName.trim();
   const key = canonical.toLowerCase();
-  return KNOWN_CITY_COORDINATES[key] || null;
+  return CITY_COORDINATES[key] || null;
 }
 
-export function calculateDistanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
-  const values = [latitudeA, longitudeA, latitudeB, longitudeB].map(Number);
-  if (!values.every(Number.isFinite)) return null;
-  const [latA, lonA, latB, lonB] = values.map((val) => (val * Math.PI) / 180);
-  const latDelta = latB - latA;
-  const lonDelta = lonB - lonA;
-  const haversine = Math.sin(latDelta / 2) ** 2 + Math.cos(latA) * Math.cos(latB) * Math.sin(lonDelta / 2) ** 2;
-  const dist = 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-  return dist < 10 ? Number(dist.toFixed(1)) : Math.round(dist);
-}
-
-function currentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject({ code: "UNSUPPORTED" });
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, GEO_OPTIONS);
-  });
-}
-
-function messageFor(error) {
-  if (error?.code === 1 || error?.code === error?.PERMISSION_DENIED) return "Location access was not allowed. You can still browse jobs, but nearby distance and directions may be unavailable.";
-  if (error?.code === 3 || error?.code === error?.TIMEOUT) return "Location request timed out. You can still browse jobs.";
-  if (error?.code === "UNSUPPORTED") return "Your browser does not support location. You can still browse jobs.";
-  return "Your location is unavailable right now. You can still browse jobs.";
-}
-
-// One-time current-location capture shared by worker registration/dashboard and sign-in.
-export async function captureAndSaveWorkerLocation() {
-  try {
-    const position = await currentPosition();
-    const saved = await apiRequest("/workers/location", {
-      method: "POST",
-      body: JSON.stringify({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-      }),
-    });
-    let city = null;
-    try {
-      const result = await apiRequest(`/location/reverse?latitude=${encodeURIComponent(saved.location.latitude)}&longitude=${encodeURIComponent(saved.location.longitude)}`);
-      city = result.city || null;
-    } catch {
-      // The stored city remains untouched when reverse geocoding is unavailable.
-    }
-    return { success: true, location: saved.location, city, message: "Location enabled" };
-  } catch (error) {
-    return { success: false, message: messageFor(error) };
-  }
-}

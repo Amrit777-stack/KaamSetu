@@ -2,27 +2,14 @@ import { getJobs } from "./jobService.js";
 import { getWorkerProfile } from "./workerService.js";
 import { calculateDistanceKm, roundedDistanceKm } from "./distanceService.js";
 
-const CITY_COORDINATES = {
-  pune: { latitude: 18.5204, longitude: 73.8567 },
-  mumbai: { latitude: 19.0760, longitude: 72.8777 },
-  chennai: { latitude: 13.0827, longitude: 80.2707 },
-  vellore: { latitude: 12.9165, longitude: 79.1325 },
-  katpadi: { latitude: 12.9707, longitude: 79.1637 },
-  bengaluru: { latitude: 12.9716, longitude: 77.5946 },
-  bangalore: { latitude: 12.9716, longitude: 77.5946 },
-  delhi: { latitude: 28.6139, longitude: 77.2090 },
-  "new delhi": { latitude: 28.6139, longitude: 77.2090 },
-  hyderabad: { latitude: 17.3850, longitude: 78.4867 },
-  ahmedabad: { latitude: 23.0225, longitude: 72.5714 },
-  kochi: { latitude: 9.9312, longitude: 76.2673 },
-  patna: { latitude: 25.5941, longitude: 85.1376 },
-  mysuru: { latitude: 12.2958, longitude: 76.6394 },
-  bhubaneswar: { latitude: 20.2961, longitude: 85.8245 },
-  coimbatore: { latitude: 11.0168, longitude: 76.9558 },
-  lucknow: { latitude: 26.8467, longitude: 80.9462 },
-  jaipur: { latitude: 26.9084, longitude: 75.7953 },
-  ranipet: { latitude: 12.9309, longitude: 79.3373 },
-};
+export {
+  CITY_COORDINATES,
+  CITY_ALIASES,
+  resolveCity,
+  getCityCoordinates,
+} from "./cityCoordinates.js";
+import { resolveCity, CITY_COORDINATES } from "./cityCoordinates.js";
+
 
 const fields = ["occupation", "skills", "experience_years", "location", "expected_salary_min", "preferred_shift"];
 const occupations = ["welder", "electrician", "plumber", "carpenter", "painter", "mason", "driver", "helper", "operator"];
@@ -61,8 +48,11 @@ function extract(answer, current) {
     next.skills = [...new Set([...next.skills, ...skills.map((skill) => skill.toLowerCase())])];
   }
   if (/\b(year|years|experience|साल|वर्ष)\b/i.test(text) || /नया|new/i.test(text)) next.experience_years = /नया|new/i.test(text) ? 0 : numberIn(text);
-  const city = text.match(/\b(pune|mumbai|chennai|vellore|bengaluru|bangalore|delhi|hyderabad)\b/i);
-  if (city) next.location = city[1].replace(/^./, (char) => char.toUpperCase());
+  
+  // Resolve city from answer in any step
+  const detectedCity = resolveCity(text);
+  if (detectedCity) next.location = detectedCity;
+
   if (/\b(salary|pay|rupee|₹|हजार|हज़ार|salary)\b/i.test(text)) {
     const amount = numberIn(text);
     if (amount != null) next.expected_salary_min = amount < 1000 ? amount * 1000 : amount;
@@ -75,7 +65,7 @@ function extract(answer, current) {
   if (current._asked === "occupation" && !next.occupation && text) next.occupation = text;
   if (current._asked === "skills" && next.skills.length === (current.skills || []).length && text) next.skills = [...new Set([...next.skills, text.toLowerCase()])];
   if (current._asked === "experience_years" && next.experience_years == null) next.experience_years = numberIn(text);
-  if (current._asked === "location" && !next.location && text) next.location = text;
+  if (current._asked === "location" && text) next.location = detectedCity || resolveCity(text) || text;
   if (current._asked === "expected_salary_min" && next.expected_salary_min == null) { const amount = numberIn(text); if (amount != null) next.expected_salary_min = amount < 1000 ? amount * 1000 : amount; }
   return next;
 }
@@ -98,7 +88,16 @@ function scoreJob(job, search) {
   if (skillMatch) { breakdown.skills = 40; reasons.push("Your work skills match this job"); }
   const requiredExperience = Number(job.experience_required ?? job.required_experience ?? 0);
   if (search.experience_years != null && search.experience_years >= requiredExperience) { breakdown.experience = 20; reasons.push("Your experience meets the requirement"); }
-  if (search.location && String(job.location || "").toLowerCase() === search.location.toLowerCase()) { breakdown.location = 15; reasons.push(`The job is in ${job.location}`); }
+  
+  if (search.location) {
+    const jobLoc = String(job.location || "").toLowerCase().trim();
+    const searchLoc = String(search.location).toLowerCase().trim();
+    if (jobLoc === searchLoc || jobLoc.includes(searchLoc) || searchLoc.includes(jobLoc)) {
+      breakdown.location = 50; // High location bonus for user's searched city
+      reasons.push(`The job is in ${job.location}`);
+    }
+  }
+
   if (search.expected_salary_min != null && Number(job.salary_max || 0) >= search.expected_salary_min) { breakdown.salary = Number(job.salary_min || 0) >= search.expected_salary_min ? 15 : 8; reasons.push("The salary meets your minimum expectation"); }
   if (search.preferred_shift && (search.preferred_shift === "any" || String(job.shift || "").toLowerCase() === search.preferred_shift)) { breakdown.shift = search.preferred_shift === "any" ? 10 : 10; reasons.push("The shift matches your preference"); }
   return { job, matchScore: Object.values(breakdown).reduce((sum, value) => sum + value, 0), breakdown, reasons };
@@ -125,33 +124,60 @@ export async function continueVoiceJobSearch({
     return { search: next, nextQuestion: questionFor(nextField, next, language), isComplete: false };
   }
 
-  // Determine reference coordinates for distance calculations
-  let workerLat = Number.isFinite(Number(latitude)) ? Number(latitude) : null;
-  let workerLon = Number.isFinite(Number(longitude)) ? Number(longitude) : null;
+  // 1. Determine reference coordinates for search and distance calculations
+  // CRITICAL: When the worker explicitly entered a location (e.g. Mumbai, Chennai),
+  // that searched location MUST be the primary reference point, NOT the browser GPS map location!
+  const targetCity = next.location ? resolveCity(next.location) || next.location : null;
+  if (targetCity) {
+    next.location = targetCity;
+  }
 
-  if ((workerLat === null || workerLon === null) && workerId) {
-    try {
-      const profile = await getWorkerProfile(workerId);
-      if (Number.isFinite(Number(profile?.latitude)) && Number.isFinite(Number(profile?.longitude))) {
-        workerLat = Number(profile.latitude);
-        workerLon = Number(profile.longitude);
-      } else if (profile?.location) {
-        const cityKey = profile.location.toLowerCase().trim();
-        if (CITY_COORDINATES[cityKey]) {
-          workerLat = CITY_COORDINATES[cityKey].latitude;
-          workerLon = CITY_COORDINATES[cityKey].longitude;
-        }
-      }
-    } catch {
-      // Profile lookup is non-blocking
+  let searchLat = null;
+  let searchLon = null;
+  let hasSearchedLocation = false;
+
+  if (targetCity) {
+    const cityKey = targetCity.toLowerCase().trim();
+    if (CITY_COORDINATES[cityKey]) {
+      searchLat = CITY_COORDINATES[cityKey].latitude;
+      searchLon = CITY_COORDINATES[cityKey].longitude;
+      hasSearchedLocation = true;
     }
   }
 
-  if ((workerLat === null || workerLon === null) && (location || next.location)) {
-    const locKey = String(location || next.location).toLowerCase().trim();
+  // Reference coordinates for querying jobs
+  let refLat = searchLat;
+  let refLon = searchLon;
+
+  // Fallback to browser GPS or profile location ONLY if user didn't specify a custom location
+  if (refLat === null || refLon === null) {
+    if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
+      refLat = Number(latitude);
+      refLon = Number(longitude);
+    } else if (workerId) {
+      try {
+        const profile = await getWorkerProfile(workerId);
+        if (Number.isFinite(Number(profile?.latitude)) && Number.isFinite(Number(profile?.longitude))) {
+          refLat = Number(profile.latitude);
+          refLon = Number(profile.longitude);
+        } else if (profile?.location) {
+          const cityKey = profile.location.toLowerCase().trim();
+          if (CITY_COORDINATES[cityKey]) {
+            refLat = CITY_COORDINATES[cityKey].latitude;
+            refLon = CITY_COORDINATES[cityKey].longitude;
+          }
+        }
+      } catch {
+        // Profile lookup is non-blocking
+      }
+    }
+  }
+
+  if ((refLat === null || refLon === null) && location) {
+    const locKey = String(location).toLowerCase().trim();
     if (CITY_COORDINATES[locKey]) {
-      workerLat = CITY_COORDINATES[locKey].latitude;
-      workerLon = CITY_COORDINATES[locKey].longitude;
+      refLat = CITY_COORDINATES[locKey].latitude;
+      refLon = CITY_COORDINATES[locKey].longitude;
     }
   }
 
@@ -159,22 +185,22 @@ export async function continueVoiceJobSearch({
     open_only: true,
     unique: true,
     limit: 50,
-    latitude: workerLat,
-    longitude: workerLon,
-    order_by: workerLat !== null && workerLon !== null ? "distance" : undefined,
+    latitude: refLat,
+    longitude: refLon,
+    order_by: refLat !== null && refLon !== null ? "distance" : undefined,
   });
 
   const matches = jobs
     .map((job) => {
       let dist = job.distance_km;
+      // Calculate distance relative to the reference coordinates (searched city or worker GPS)
       if (
-        !Number.isFinite(dist) &&
-        workerLat !== null &&
-        workerLon !== null &&
+        refLat !== null &&
+        refLon !== null &&
         Number.isFinite(Number(job.latitude)) &&
         Number.isFinite(Number(job.longitude))
       ) {
-        const raw = calculateDistanceKm(workerLat, workerLon, Number(job.latitude), Number(job.longitude));
+        const raw = calculateDistanceKm(refLat, refLon, Number(job.latitude), Number(job.longitude));
         dist = roundedDistanceKm(raw);
       }
       const jobWithDist = { ...job, distance_km: dist };
@@ -183,12 +209,34 @@ export async function continueVoiceJobSearch({
     .filter((match) => match.matchScore > 0);
 
   matches.sort((a, b) => {
+    // Priority 1: When a location was explicitly searched, jobs in that location come FIRST!
+    if (targetCity) {
+      const targetLower = targetCity.toLowerCase();
+      const aLocMatch = String(a.job.location || "").toLowerCase().includes(targetLower);
+      const bLocMatch = String(b.job.location || "").toLowerCase().includes(targetLower);
+      if (aLocMatch && !bLocMatch) return -1;
+      if (!aLocMatch && bLocMatch) return 1;
+    }
+
+    // Priority 2: Higher suitability matchScore
+    if (b.matchScore !== a.matchScore) {
+      return b.matchScore - a.matchScore;
+    }
+
+    // Priority 3: Least to max distance from the reference location
     const aDist = Number.isFinite(a.job.distance_km) ? a.job.distance_km : Infinity;
     const bDist = Number.isFinite(b.job.distance_km) ? b.job.distance_km : Infinity;
-    if (aDist !== bDist) return aDist - bDist; // Ascending distance (least to max distance)
-    return b.matchScore - a.matchScore; // Higher suitability first when distance is equal
+    return aDist - bDist;
   });
 
   delete next._asked;
-  return { search: next, nextQuestion: null, isComplete: true, matches };
+  return {
+    search: next,
+    nextQuestion: null,
+    isComplete: true,
+    matches,
+    searchedLocation: targetCity || null,
+    isCustomLocation: hasSearchedLocation,
+  };
 }
+

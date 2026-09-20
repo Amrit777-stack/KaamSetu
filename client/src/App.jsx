@@ -32,7 +32,13 @@ import {
   X,
 } from "lucide-react";
 import { apiRequest } from "./services/api.js";
-import { captureAndSaveWorkerLocation, calculateDistanceKm, KNOWN_CITY_COORDINATES } from "./services/workerLocation.js";
+import {
+  captureAndSaveWorkerLocation,
+  calculateDistanceKm,
+  KNOWN_CITY_COORDINATES,
+  resolveCity,
+  getCityCoordinates,
+} from "./services/workerLocation.js";
 import {
   prefetchQuestionTranslations,
   translateQuestion,
@@ -1522,12 +1528,29 @@ function WorkerDashboard() {
 
   const saveManualLocation = async (event) => {
     event.preventDefault();
-    if (!manualLocation.trim()) return;
+    const cityInput = manualLocation.trim();
+    if (!cityInput) return;
     try {
-      await apiRequest("/workers/location/manual", { method: "POST", body: JSON.stringify({ location: manualLocation.trim() }) });
-      setCurrentUser((user) => ({ ...user, location: manualLocation.trim() }));
+      const res = await apiRequest("/workers/location/manual", {
+        method: "POST",
+        body: JSON.stringify({ location: cityInput }),
+      });
+      const savedCity = res?.worker?.location || resolveCity(cityInput) || cityInput;
+      const coords = getCityCoordinates(savedCity);
+      const savedLat = res?.worker?.latitude ?? coords?.latitude ?? null;
+      const savedLng = res?.worker?.longitude ?? coords?.longitude ?? null;
+
+      setCurrentUser((user) => ({
+        ...user,
+        location: savedCity,
+        latitude: savedLat !== null ? savedLat : user.latitude,
+        longitude: savedLng !== null ? savedLng : user.longitude,
+      }));
+      setActiveVoiceSearchCriteria(null);
       setLocationStatus("manual");
-      setLocationMessage("Your city was saved. Enable precise location any time to see exact distances.");
+      setLocationMessage(`Your location is set to ${savedCity}.`);
+      setLocationDialog(false);
+      await loadAvailableJobs(nearbyRadius, savedLat, savedLng);
     } catch (error) {
       setLocationStatus("error");
       setLocationMessage(error.message || "Could not save your city.");
@@ -1548,6 +1571,8 @@ function WorkerDashboard() {
   // Exists only while the voice-search modal is open; never persisted.
   const [voiceSearch, setVoiceSearch] = useState(null);
   const [voiceQuestion, setVoiceQuestion] = useState("");
+  // Active voice/custom search criteria applied to opportunity list
+  const [activeVoiceSearchCriteria, setActiveVoiceSearchCriteria] = useState(null);
 
   const fetchWorkerProfileDetails = async (userId) => {
     const id = userId || currentUser?.id;
@@ -1755,18 +1780,28 @@ function WorkerDashboard() {
         }),
       });
       if (result.isComplete) {
+        const searchedLoc = result.searchedLocation || result.search?.location || null;
+        setActiveVoiceSearchCriteria({
+          ...result.search,
+          searchedLocation: searchedLoc,
+          isCustomLocation: Boolean(result.isCustomLocation),
+        });
+        const targetCoords = searchedLoc ? getCityCoordinates(searchedLoc) : null;
+        const refLat = targetCoords ? targetCoords.latitude : (Number.isFinite(currentUser?.latitude) ? currentUser.latitude : null);
+        const refLon = targetCoords ? targetCoords.longitude : (Number.isFinite(currentUser?.longitude) ? currentUser.longitude : null);
+
         const jobsWithDist = (result.matches || []).map((match) => {
           let dist = match.job?.distance_km;
           if (
             !Number.isFinite(dist) &&
-            Number.isFinite(currentUser?.latitude) &&
-            Number.isFinite(currentUser?.longitude) &&
+            Number.isFinite(refLat) &&
+            Number.isFinite(refLon) &&
             Number.isFinite(match.job?.latitude) &&
             Number.isFinite(match.job?.longitude)
           ) {
             dist = calculateDistanceKm(
-              currentUser.latitude,
-              currentUser.longitude,
+              refLat,
+              refLon,
               match.job.latitude,
               match.job.longitude
             );
@@ -1774,7 +1809,11 @@ function WorkerDashboard() {
           return { ...match.job, distance_km: dist, voiceMatch: match };
         });
         setAvailableJobs(jobsWithDist);
-        setBanner({ type: "success", title: "Jobs found", message: `${result.matches?.length || 0} matching jobs found for your voice search.` });
+        setBanner({
+          type: "success",
+          title: "Jobs found",
+          message: `${result.matches?.length || 0} matching jobs found for your voice search${searchedLoc ? ` in ${searchedLoc}` : ""}.`,
+        });
         handleCloseVoiceApply();
       } else {
         setVoiceSearch(result.search);
@@ -1887,14 +1926,19 @@ function WorkerDashboard() {
       (job) => job && (job.openings == null || Number(job.openings) > 0) && job.status !== "closed"
     );
 
-    // Determine worker coordinates or fallback city coordinates
-    let userLat = Number.isFinite(currentUser?.latitude) ? currentUser.latitude : null;
-    let userLon = Number.isFinite(currentUser?.longitude) ? currentUser.longitude : null;
-    if ((userLat === null || userLon === null) && currentUser?.location) {
-      const cityCoords = KNOWN_CITY_COORDINATES[currentUser.location.toLowerCase().trim()];
+    // Check if an active custom/voice search has a specific location
+    const searchTargetCity = activeVoiceSearchCriteria?.searchedLocation || activeVoiceSearchCriteria?.location || null;
+    const targetCoords = searchTargetCity ? getCityCoordinates(searchTargetCity) : null;
+
+    // Determine reference coordinates for distance calculations
+    let refLat = targetCoords?.latitude ?? (Number.isFinite(currentUser?.latitude) ? currentUser.latitude : null);
+    let refLon = targetCoords?.longitude ?? (Number.isFinite(currentUser?.longitude) ? currentUser.longitude : null);
+
+    if ((refLat === null || refLon === null) && currentUser?.location) {
+      const cityCoords = getCityCoordinates(currentUser.location) || KNOWN_CITY_COORDINATES[currentUser.location.toLowerCase().trim()];
       if (cityCoords) {
-        userLat = cityCoords.latitude;
-        userLon = cityCoords.longitude;
+        refLat = cityCoords.latitude;
+        refLon = cityCoords.longitude;
       }
     }
 
@@ -1907,26 +1951,38 @@ function WorkerDashboard() {
         seen.add(key);
         seen.add(Number(job.id));
 
-        // If distance_km is not finite but coordinates are available, compute it
+        // Calculate distance relative to refLat/refLon if distance is missing or when a custom city was searched
         let distanceKm = job.distance_km;
         if (
-          !Number.isFinite(distanceKm) &&
-          userLat !== null &&
-          userLon !== null &&
+          (!Number.isFinite(distanceKm) || (targetCoords && !job.voiceMatch)) &&
+          refLat !== null &&
+          refLon !== null &&
           Number.isFinite(job.latitude) &&
           Number.isFinite(job.longitude)
         ) {
-          distanceKm = calculateDistanceKm(userLat, userLon, job.latitude, job.longitude);
+          distanceKm = calculateDistanceKm(refLat, refLon, job.latitude, job.longitude);
         }
 
         unique.push(distanceKm !== job.distance_km ? { ...job, distance_km: distanceKm } : job);
       }
     }
 
-    const workerOcc = (currentUser?.occupation || "").trim().toLowerCase();
+    const workerOcc = (activeVoiceSearchCriteria?.occupation || currentUser?.occupation || "").trim().toLowerCase();
+    const targetCityLower = searchTargetCity ? searchTargetCity.toLowerCase().trim() : null;
 
-    // Order companies strictly from least to max distance (ascending distance)
+    // Order companies:
+    // 1. If worker searched a custom location, jobs matching that searched city come FIRST!
+    // 2. Least to max distance (ascending distance) relative to reference location
+    // 3. Match score / suitability
+    // 4. Occupation title match
     return [...unique].sort((a, b) => {
+      if (targetCityLower) {
+        const aLocMatch = String(a.location || "").toLowerCase().includes(targetCityLower);
+        const bLocMatch = String(b.location || "").toLowerCase().includes(targetCityLower);
+        if (aLocMatch && !bLocMatch) return -1;
+        if (!aLocMatch && bLocMatch) return 1;
+      }
+
       const aDist = Number.isFinite(a.distance_km) ? a.distance_km : Infinity;
       const bDist = Number.isFinite(b.distance_km) ? b.distance_km : Infinity;
 
@@ -1934,9 +1990,11 @@ function WorkerDashboard() {
         return aDist - bDist; // Least to max distance!
       }
 
-      // Tie-breaker 1: match_score (higher suitability first when distance is equal)
-      if (Number.isFinite(a.match_score) && Number.isFinite(b.match_score) && a.match_score !== b.match_score) {
-        return b.match_score - a.match_score;
+      // Tie-breaker 1: match_score (or voiceMatch matchScore)
+      const aScore = a.voiceMatch?.matchScore ?? (Number.isFinite(a.match_score) ? a.match_score : 0);
+      const bScore = b.voiceMatch?.matchScore ?? (Number.isFinite(b.match_score) ? b.match_score : 0);
+      if (aScore !== bScore) {
+        return bScore - aScore;
       }
 
       // Tie-breaker 2: occupation title match
@@ -1949,7 +2007,7 @@ function WorkerDashboard() {
 
       return 0;
     });
-  }, [availableJobs, currentUser.occupation, currentUser.latitude, currentUser.longitude, currentUser.location]);
+  }, [availableJobs, currentUser.occupation, currentUser.latitude, currentUser.longitude, currentUser.location, activeVoiceSearchCriteria]);
 
   return (
     <div className="site-shell">
@@ -2220,6 +2278,59 @@ function WorkerDashboard() {
                   </select>
                 </label>
               </div>
+
+              {activeVoiceSearchCriteria && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: "#eef7ee",
+                    border: "1px solid #c3e2c6",
+                    borderRadius: "10px",
+                    padding: "10px 16px",
+                    marginBottom: "16px",
+                    fontSize: "14px",
+                    color: "#184420",
+                    flexWrap: "wrap",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <MapPin size={16} style={{ color: "var(--green)" }} />
+                    <span>
+                      {t.showingJobsIn || "Showing jobs matching:"}{" "}
+                      <strong>
+                        {activeVoiceSearchCriteria.occupation ? `${activeVoiceSearchCriteria.occupation} ` : ""}
+                        {activeVoiceSearchCriteria.searchedLocation || activeVoiceSearchCriteria.location
+                          ? `in ${activeVoiceSearchCriteria.searchedLocation || activeVoiceSearchCriteria.location}`
+                          : ""}
+                      </strong>
+                      {activeVoiceSearchCriteria.skills?.length > 0
+                        ? ` (${activeVoiceSearchCriteria.skills.join(", ")})`
+                        : ""}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="button secondary small"
+                    onClick={async () => {
+                      setActiveVoiceSearchCriteria(null);
+                      await loadAvailableJobs();
+                    }}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "12px",
+                      height: "auto",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <X size={13} /> {t.clearFilterShowNearby || "Clear Filter · Show Nearby Jobs"}
+                  </button>
+                </div>
+              )}
               {displayedAvailableJobs.length === 0 ? (
                 <div className="empty-state">{t.noOpenJobs || "No open jobs available currently. Check back soon!"}</div>
               ) : (
