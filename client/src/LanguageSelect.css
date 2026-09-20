@@ -4,57 +4,188 @@
   position: relative;
 }
 
+/* Custom trigger button matching website UI */
 .language-button {
-  padding: 8px 12px;
-  border: 1px solid #dbe3d6;
-  border-radius: 8px;
-  background: #f7faf3;
-  color: var(--green);
+  padding: 8px 14px;
+  border: 1px solid var(--line, #e8e8e1);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--ink, #1d2924);
   cursor: pointer;
-  transition: 0.18s ease;
+  transition: all 0.18s ease;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  font-family: "DM Sans", "Noto Sans Devanagari", sans-serif;
   font-size: 13px;
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.language-button:hover {
+.language-button:hover,
+.language-button.active {
   border-color: #98b29e;
-  background: #eef5e8;
+  background: #f6faf5;
+  color: var(--green);
 }
 
-.language-button:focus-within {
+.language-button:focus-visible {
+  outline: none;
   border-color: var(--green);
-  box-shadow: 0 0 0 3px #2064491a;
+  box-shadow: 0 0 0 3px rgba(32, 100, 73, 0.18);
 }
 
-.language-button select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  min-width: 90px;
-  border: 0;
-  background: transparent;
-  color: var(--green-dark, #174e39);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
+.language-chevron {
+  transition: transform 0.2s ease;
+  color: var(--muted, #68736e);
+}
+
+.language-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+/* Custom Language Dropdown Dialog Box matching website page theme */
+.language-dialog-box {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  background: #ffffff;
+  border: 1px solid var(--line, #e8e8e1);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 16px 36px rgba(18, 44, 27, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04);
+  z-index: 1000;
+  font-family: "DM Sans", "Noto Sans Devanagari", sans-serif;
+  animation: languageDialogFadeIn 0.16s ease-out;
+}
+
+@keyframes languageDialogFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.language-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px 10px;
+  border-bottom: 1px solid var(--line, #e8e8e1);
+  margin-bottom: 6px;
+}
+
+.language-dialog-title {
+  font-size: 11px;
   font-weight: 700;
-  outline: 0;
-  padding-right: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.language-button select option {
-  background: #fff;
-  color: var(--ink, #1d2924);
+.language-dialog-count {
+  font-size: 11px;
+  color: var(--muted);
   font-weight: 600;
-  padding: 8px 10px;
 }
 
-.language-button svg:last-child {
-  width: 14px;
-  height: 14px;
-  pointer-events: none;
+.language-dialog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.language-dialog-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink, #1d2924);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  text-align: left;
+}
+
+.language-dialog-item:hover {
+  background: #f6faf5;
+  border-color: #dbe8dc;
+}
+
+.language-dialog-item.selected {
+  background: #edf5ee;
+  border-color: #c4ddc9;
+}
+
+.language-dialog-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.language-dialog-code {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f0f4eb;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
 }
+
+.language-dialog-item.selected .language-dialog-code {
+  background: var(--green);
+  color: #ffffff;
+}
+
+.language-dialog-names {
+  display: flex;
+  flex-direction: column;
+}
+
+.language-dialog-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.language-dialog-item.selected .language-dialog-name {
+  color: var(--green-dark, #174e39);
+}
+
+.language-dialog-english {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.language-dialog-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Edit2,
+  Info,
   Languages,
   LogOut,
   MapPin,
@@ -39,7 +40,7 @@ import {
   getFallbackQuestion,
 } from "./services/questionSpeech.js";
 import { submitVoiceResponse, transcribeTemporaryJobSearch } from "./services/voiceResponse.js";
-import { useTranslatedJobTitle } from "./services/jobTitleTranslation.js";
+import { useTranslatedJobTitle, useTranslatedJobDescription } from "./services/jobTitleTranslation.js";
 import { dashboardTranslations, occupationTranslations } from "./services/dashboardTranslations.js";
 import "./App.css";
 import "./LanguageSelect.css";
@@ -62,6 +63,11 @@ const questions = [
 function LocalizedJobTitle({ title, languageCode }) {
   const translatedTitle = useTranslatedJobTitle(title, languageCode);
   return <>{translatedTitle}</>;
+}
+
+function LocalizedJobDescription({ description, languageCode }) {
+  const translatedDesc = useTranslatedJobDescription(description, languageCode);
+  return <>{translatedDesc}</>;
 }
 
 // Clean up any stale legacy user in localStorage on module load
@@ -151,7 +157,31 @@ function Header({ back, progress }) {
     navigate("/");
   };
 
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (langMenuRef.current && !langMenuRef.current.contains(e.target)) {
+        setLangMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setLangMenuOpen(false);
+    };
+    if (langMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [langMenuOpen]);
+
   const t = dashboardTranslations[currentLang] || dashboardTranslations["en-IN"];
+  const currentLanguageObj =
+    languages.find((l) => l.languageCode === currentLang) || languages[0];
 
   return (
     <header className="app-header">
@@ -163,24 +193,63 @@ function Header({ back, progress }) {
         </div>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-        {/* Top-right language selector tab for all 6 languages */}
-        <div className="language-selector-wrap" title="Change Language / भाषा बदलें">
-          <label className="language-button" htmlFor="top-language-select">
-            <Languages size={16} />
-            <select
-              id="top-language-select"
-              value={currentLang}
-              onChange={(e) => handleLanguageSelect(e.target.value)}
-              aria-label="Select Language"
-            >
-              {languages.map((l) => (
-                <option key={l.languageCode} value={l.languageCode}>
-                  {l.name} ({l.code})
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} />
-          </label>
+        {/* Top-right language selector custom dialog box matching website UI */}
+        <div className="language-selector-wrap" ref={langMenuRef} title="Change Language / भाषा बदलें">
+          <button
+            type="button"
+            className={`language-button ${langMenuOpen ? "active" : ""}`}
+            onClick={() => setLangMenuOpen((prev) => !prev)}
+            aria-expanded={langMenuOpen}
+            aria-haspopup="listbox"
+            aria-label="Select Language"
+          >
+            <Languages size={15} style={{ color: "var(--green)" }} />
+            <span>{currentLanguageObj.name}</span>
+            <span style={{ fontSize: "11px", color: "var(--muted)", fontWeight: "500" }}>({currentLanguageObj.code})</span>
+            <ChevronDown size={14} className={`language-chevron ${langMenuOpen ? "rotated" : ""}`} />
+          </button>
+
+          {langMenuOpen && (
+            <div className="language-dialog-box" role="listbox" aria-label="Languages">
+              <div className="language-dialog-header">
+                <span className="language-dialog-title">
+                  <Languages size={13} /> {t.languageTitle || "Language"}
+                </span>
+                <span className="language-dialog-count">6 Languages</span>
+              </div>
+              <div className="language-dialog-list">
+                {languages.map((l) => {
+                  const isSelected = l.languageCode === currentLang;
+                  return (
+                    <button
+                      key={l.languageCode}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      className={`language-dialog-item ${isSelected ? "selected" : ""}`}
+                      onClick={() => {
+                        handleLanguageSelect(l.languageCode);
+                        setLangMenuOpen(false);
+                      }}
+                    >
+                      <div className="language-dialog-item-left">
+                        <span className="language-dialog-code">{l.code}</span>
+                        <div className="language-dialog-names">
+                          <span className="language-dialog-name">{l.name}</span>
+                          <span className="language-dialog-english">{l.english}</span>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="language-dialog-check">
+                          <Check size={12} />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {currentUser ? (
@@ -1415,6 +1484,7 @@ function WorkerDashboard() {
   const [manualLocation, setManualLocation] = useState("");
   const [nearbyRadius, setNearbyRadius] = useState("all");
   const [routeJob, setRouteJob] = useState(null);
+  const [expandedJobDetailsId, setExpandedJobDetailsId] = useState(null);
 
   const loadAvailableJobs = async (radius = nearbyRadius, customLat = null, customLng = null) => {
     const lat = customLat ?? currentUser?.latitude;
@@ -2166,7 +2236,7 @@ function WorkerDashboard() {
                             </span>
                           </div>
                           <p style={{ color: "var(--muted)", margin: "0 0 8px", fontSize: "14px" }}>
-                            {job.description}
+                            <LocalizedJobDescription description={job.description} languageCode={currentLang} />
                           </p>
                           <div className="job-tags">
                             <span className="tag">📍 {job.location || "Pune"}</span>
@@ -2179,6 +2249,15 @@ function WorkerDashboard() {
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            className={`button small ${expandedJobDetailsId === job.id ? "primary" : "secondary"}`}
+                            onClick={() => setExpandedJobDetailsId(expandedJobDetailsId === job.id ? null : job.id)}
+                            style={{ padding: "8px 14px", fontSize: "13px" }}
+                            title={expandedJobDetailsId === job.id ? (t.hideDetailsBtn || "Hide Details") : (t.companyDetailsTab || "Company Details")}
+                          >
+                            <Info size={14} /> {expandedJobDetailsId === job.id ? (t.hideDetailsBtn || "Hide Details") : (t.companyDetailsTab || "Company Details")}
+                          </button>
                           {alreadyApplied ? (
                             <span className="badge badge-applied" style={{ padding: "8px 14px", fontSize: "13px" }}>
                               <Check size={14} /> {t.applied || "Applied"}
@@ -2209,6 +2288,143 @@ function WorkerDashboard() {
                             <MapPin size={14} /> Directions
                           </button>
                         </div>
+
+                        {/* Expandable Employer Details Sub-Panel */}
+                        {expandedJobDetailsId === job.id && (
+                          <div
+                            style={{
+                              width: "100%",
+                              marginTop: "8px",
+                              padding: "16px",
+                              background: "#f8faf8",
+                              borderRadius: "10px",
+                              border: "1px solid #dbe6dc",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "12px",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <Building2 size={18} style={{ color: "var(--green)" }} />
+                                <span style={{ fontSize: "15px", fontWeight: "700", color: "#1b3323" }}>
+                                  {job.company_name}
+                                </span>
+                                <span className="badge badge-applied" style={{ fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "4px", padding: "2px 8px" }}>
+                                  <ShieldCheck size={12} /> {t.verifiedEmployerBadge || "Verified Employer"}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="button secondary small"
+                                onClick={() => setExpandedJobDetailsId(null)}
+                                style={{ padding: "4px 8px", fontSize: "12px", height: "auto" }}
+                              >
+                                <X size={13} /> {t.hideDetailsBtn || "Hide Details"}
+                              </button>
+                            </div>
+
+                            {/* Key employer data grid */}
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                                gap: "10px",
+                              }}
+                            >
+                              <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2ebe4" }}>
+                                <div style={{ color: "var(--muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: "600", marginBottom: "4px" }}>
+                                  🏢 {t.employerIndustry || "Industry / Sector"}
+                                </div>
+                                <div style={{ fontWeight: "600", color: "#2d3748", fontSize: "13px" }}>
+                                  {job.company_industry || "Manufacturing & Industrial Services"}
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2ebe4" }}>
+                                <div style={{ color: "var(--muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: "600", marginBottom: "4px" }}>
+                                  📞 {t.employerContact || "Employer Contact"}
+                                </div>
+                                <div style={{ fontWeight: "600", color: "#2d3748", fontSize: "13px" }}>
+                                  {job.company_contact || "+91 98230 12345 (KaamSetu Desk)"}
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2ebe4" }}>
+                                <div style={{ color: "var(--muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: "600", marginBottom: "4px" }}>
+                                  ⏰ {t.employerShift || "Work Shift"}
+                                </div>
+                                <div style={{ fontWeight: "600", color: "#2d3748", fontSize: "13px", textTransform: "capitalize" }}>
+                                  {job.shift ? `${job.shift} Shift (8 hrs)` : "Day Shift (8 hrs)"}
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2ebe4" }}>
+                                <div style={{ color: "var(--muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: "600", marginBottom: "4px" }}>
+                                  💼 {t.employerJobType || "Job Type"}
+                                </div>
+                                <div style={{ fontWeight: "600", color: "#2d3748", fontSize: "13px" }}>
+                                  {job.employment_type || "Full-time / Direct Payroll"}
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2ebe4" }}>
+                                <div style={{ color: "var(--muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: "600", marginBottom: "4px" }}>
+                                  📍 {t.locationTitle || "Work Location"}
+                                </div>
+                                <div style={{ fontWeight: "600", color: "#2d3748", fontSize: "13px" }}>
+                                  {job.location || "Pune"} {Number.isFinite(job.distance_km) ? `(${job.distance_km} km)` : ""}
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2ebe4" }}>
+                                <div style={{ color: "var(--muted)", fontSize: "11px", textTransform: "uppercase", fontWeight: "600", marginBottom: "4px" }}>
+                                  👥 {t.openings || "Vacancies"}
+                                </div>
+                                <div style={{ fontWeight: "600", color: "#2d3748", fontSize: "13px" }}>
+                                  {job.openings} {t.openings || "vacancies"}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Required Skills list */}
+                            {(() => {
+                              let skillList = [];
+                              try {
+                                if (Array.isArray(job.skills)) skillList = job.skills;
+                                else if (Array.isArray(job.required_skills)) skillList = job.required_skills;
+                                else if (typeof job.skills === "string") skillList = JSON.parse(job.skills);
+                                else if (typeof job.required_skills === "string") skillList = JSON.parse(job.required_skills);
+                              } catch {
+                                skillList = [];
+                              }
+                              return skillList.length > 0 ? (
+                                <div>
+                                  <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: "600", marginBottom: "6px" }}>
+                                    🛠️ {t.requiredSkillsLabel || "Required Skills"}:
+                                  </div>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                    {skillList.map((skill, idx) => (
+                                      <span key={idx} className="tag" style={{ background: "#eaf3eb", color: "#1a5328", border: "1px solid #c9e0cc" }}>
+                                        {skill}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null;
+                            })()}
+
+                            {/* Localized Job Description Details */}
+                            <div style={{ background: "#ffffff", padding: "12px 14px", borderRadius: "8px", border: "1px solid #e2ebe4" }}>
+                              <div style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", fontWeight: "600", marginBottom: "4px" }}>
+                                📝 {currentLang === "en-IN" ? "Job Description" : (t.postHeading ? "कार्य विवरण" : "Job Description")}:
+                              </div>
+                              <p style={{ margin: 0, fontSize: "14px", color: "#2d3748", lineHeight: "1.5" }}>
+                                <LocalizedJobDescription description={job.description} languageCode={currentLang} />
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

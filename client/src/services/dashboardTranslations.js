@@ -106,6 +106,14 @@ export const dashboardTranslations = {
     hireBtn: "Hire Candidate",
     backToListBtn: "Back to List",
     loadingWorkerDetails: "Loading worker details from database...",
+    companyDetailsTab: "Company Details",
+    hideDetailsBtn: "Hide Details",
+    employerIndustry: "Industry / Sector",
+    employerContact: "Employer Contact",
+    employerShift: "Work Shift",
+    employerJobType: "Job Type",
+    verifiedEmployerBadge: "Verified Employer",
+    requiredSkillsLabel: "Required Skills",
     apps: [
       {
         jobTitle: "MIG Welder",
@@ -239,6 +247,14 @@ export const dashboardTranslations = {
     hireBtn: "उम्मीदवार को नियुक्त करें",
     backToListBtn: "सूची पर वापस जाएं",
     loadingWorkerDetails: "डेटाबेस से श्रमिक विवरण लोड हो रहा है...",
+    companyDetailsTab: "कंपनी विवरण",
+    hideDetailsBtn: "विवरण छिपाएं",
+    employerIndustry: "उद्योग / क्षेत्र",
+    employerContact: "नियोक्ता संपर्क",
+    employerShift: "कार्य पाली",
+    employerJobType: "रोजगार प्रकार",
+    verifiedEmployerBadge: "सत्यापित नियोक्ता",
+    requiredSkillsLabel: "आवश्यक कौशल",
     apps: [
       {
         jobTitle: "एमआईजी वेल्डर (MIG Welder)",
@@ -373,6 +389,14 @@ export const dashboardTranslations = {
     hireBtn: "பணியில் அமர்த்தவும்",
     backToListBtn: "பட்டியலுக்குத் திரும்பு",
     loadingWorkerDetails: "தரவுத்தளத்திலிருந்து விவரங்கள் ஏற்றப்படுகின்றன...",
+    companyDetailsTab: "நிறுவன விவரங்கள்",
+    hideDetailsBtn: "விவரங்களை மறை",
+    employerIndustry: "தொழில்துறை",
+    employerContact: "முதலாளி தொடர்பு",
+    employerShift: "வேலை ஷிப்ட்",
+    employerJobType: "வேலை வகை",
+    verifiedEmployerBadge: "சரிபார்க்கப்பட்ட முதலாளி",
+    requiredSkillsLabel: "தேவையான திறன்கள்",
     apps: [
       {
         jobTitle: "MIG வெல்டர் (MIG Welder)",
@@ -507,6 +531,14 @@ export const dashboardTranslations = {
     hireBtn: "అభ్యర్థిని నియమించండి",
     backToListBtn: "జాబితాకు తిరిగి వెళ్లండి",
     loadingWorkerDetails: "డేటాబేస్ నుండి వివరాలు లోడ్ అవుతున్నాయి...",
+    companyDetailsTab: "కంపెనీ వివరాలు",
+    hideDetailsBtn: "వివరాలను దాచు",
+    employerIndustry: "పరిశ్రమ",
+    employerContact: "యజమాని సంప్రదింపు",
+    employerShift: "పని షిఫ్ట్",
+    employerJobType: "ఉద్యోగ రకం",
+    verifiedEmployerBadge: "ధృవీకరించబడిన యజమాని",
+    requiredSkillsLabel: "అవసరమైన నైపుణ్యాలు",
     apps: [
       {
         jobTitle: "MIG వెల్డర్ (MIG Welder)",
@@ -641,6 +673,14 @@ export const dashboardTranslations = {
     hireBtn: "ಅಭ್ಯರ್ಥಿಯನ್ನು ನೇಮಿಸಿ",
     backToListBtn: "ಪಟ್ಟಿಗೆ ಹಿಂತಿರುಗಿ",
     loadingWorkerDetails: "ಡೇಟಾಬೇಸ್‌ನಿಂದ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...",
+    companyDetailsTab: "ಕಂಪನಿ ವಿವರಗಳು",
+    hideDetailsBtn: "ವಿವರಗಳನ್ನು ಮರೆಮಾಡಿ",
+    employerIndustry: "ಉದ್ಯಮ",
+    employerContact: "ಮಾಲೀಕರ ಸಂಪರ್ಕ",
+    employerShift: "ಕೆಲಸದ ಶಿಫ್ಟ್",
+    employerJobType: "ಉದ್ಯೋಗ ಪ್ರಕಾರ",
+    verifiedEmployerBadge: "ದೃಢೀಕರಿಸಿದ ಮಾಲೀಕರು",
+    requiredSkillsLabel: "ಅಗತ್ಯವಿರುವ ಕೌಶಲ್ಯಗಳು",
     apps: [
       {
         jobTitle: "MIG ವೆಲ್ಡರ್ (MIG Welder)",
@@ -775,6 +815,14 @@ export const dashboardTranslations = {
     hireBtn: "उमेदवाराला कामावर घ्या",
     backToListBtn: "यादीवर परत जा",
     loadingWorkerDetails: "डेटाबेसवरून तपशील लोड होत आहेत...",
+    companyDetailsTab: "कंपनी तपशील",
+    hideDetailsBtn: "तपशील लपवा",
+    employerIndustry: "उद्योग / क्षेत्र",
+    employerContact: "नियोक्ता संपर्क",
+    employerShift: "कामाची शिफ्ट",
+    employerJobType: "नोकरीचा प्रकार",
+    verifiedEmployerBadge: "पडताळणीकृत नियोक्ता",
+    requiredSkillsLabel: "आवश्यक कौशल्ये",
     apps: [
       {
         jobTitle: "एमआयजी वेल्डर (MIG Welder)",
